@@ -1,7 +1,7 @@
 # BuildBarberSDK
 
 BuildBarberSDK lets an iOS app collect a screen recording, checklist status, and
-user feedback as a session.
+user feedback for a test session so it will all appear in the BuildBarber portal.
 
 ## Requirements
 
