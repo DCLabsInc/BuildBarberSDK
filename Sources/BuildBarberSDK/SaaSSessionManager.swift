@@ -9,20 +9,19 @@ public final class SaaSSessionManager {
     public static let shared = SaaSSessionManager()
 
     private struct Configuration {
-        let apiKey: String
-        let endpoint: URL
+        let client: BuildBarberClient
+        let testType: BuildBarberTestType
+        let codeword: String
     }
 
     private var configuration: Configuration?
-    private let model = SessionModel()
+    private var currentTest: BuildBarberTest?
     private let recorder = ScreenRecorder()
     private var overlay: FloatingOverlay?
     private var menuController: UIViewController?
-    private var startedAt = Date()
-    private var sessionID = UUID().uuidString
-    private var interrupted = false
     private var pendingVideoURL: URL?
     private var awaitingFeedback = false
+    private var isLoadingTest = false
     private var backgroundObserver: NSObjectProtocol?
     private var foregroundObserver: NSObjectProtocol?
     private var isActive = false
@@ -31,30 +30,54 @@ public final class SaaSSessionManager {
 
     // MARK: Configuration
 
-    public func configure(apiKey: String, apiEndpoint: URL, checklistItems: [String]) {
-        configuration = Configuration(apiKey: apiKey, endpoint: apiEndpoint)
-        model.items = checklistItems.enumerated().map { ChecklistEntry(id: $0.offset, title: $0.element, isTicked: false) }
-        model.feedback = ""
-    }
-
-    /// Ticks or unticks a checklist item. Out-of-range indices are ignored.
-    public func updateChecklist(itemIndex: Int, isTicked: Bool) {
-        guard model.items.indices.contains(itemIndex) else { return }
-        model.items[itemIndex].isTicked = isTicked
+    public func configure(apiKey: String, testType: BuildBarberTestType, codeword: String) {
+        configuration = Configuration(
+            client: BuildBarberClient(configuration: BuildBarberConfiguration(apiKey: apiKey)),
+            testType: testType,
+            codeword: codeword)
     }
 
     // MARK: Session start
 
     public func startSession(presentingFrom viewController: UIViewController) {
-        guard configuration != nil, !isActive else { return }
+        guard let configuration, !isActive, !isLoadingTest else { return }
+        isLoadingTest = true
+        Task {
+            defer { isLoadingTest = false }
+            do {
+                currentTest = try await configuration.client.fetchTest(
+                    type: configuration.testType,
+                    codeword: configuration.codeword)
+                presentConfirmation(from: viewController)
+            } catch {
+                let message: String
+                if let apiError = error as? BuildBarberError,
+                   case let .api(_, body) = apiError,
+                   body.error == "test_not_found" {
+                    message = "The test could not be found. Check the codeword and try again."
+                } else {
+                    message = "The test could not be loaded. Please try again."
+                }
+                showError(message, from: viewController)
+            }
+        }
+    }
+
+    private func presentConfirmation(from viewController: UIViewController) {
         let alert = UIAlertController(
             title: "Record this session?",
-            message: "This session will record your screen and audio so you can share feedback. Recording only starts after you confirm and select what to share. You can end it at any time from the floating button.",
+            message: "This session will record your screen and audio while you test. Recording only starts after you confirm and select what to share. Submit your result from the session menu when finished.",
             preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Confirm", style: .default) { [weak self] _ in
             Task { @MainActor in await self?.beginRecording(from: viewController) }
         })
+        viewController.present(alert, animated: true)
+    }
+
+    private func showError(_ message: String, from viewController: UIViewController) {
+        let alert = UIAlertController(title: "Unable to load test", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
         viewController.present(alert, animated: true)
     }
 
@@ -66,11 +89,8 @@ public final class SaaSSessionManager {
             return // user cancelled the picker or permission was denied
         }
         isActive = true
-        interrupted = false
         awaitingFeedback = false
         pendingVideoURL = nil
-        sessionID = UUID().uuidString
-        startedAt = Date()
         recorder.onStreamError = { [weak self] _ in
             Task { @MainActor in await self?.handleInterruption() }
         }
@@ -87,13 +107,18 @@ public final class SaaSSessionManager {
 
     private func presentMenu() {
         guard menuController == nil, let presenter = overlay?.presenter else { return }
-        let view = ChecklistMenuView(
-            model: model,
-            onContinue: { [weak self] in self?.dismissMenu() },
-            onEnd: { [weak self] in
-                self?.dismissMenu()
-                Task { @MainActor in await self?.endSession() }
-            })
+        guard let test = currentTest else { return }
+        let view = ChecklistMenuView(test: test) { [weak self] outcome, email, feedback, checkedItems in
+            guard let self, let configuration = self.configuration else { return }
+            let result = BuildBarberTestResult(
+                testType: configuration.testType,
+                codeword: configuration.codeword,
+                testerEmail: email,
+                outcome: outcome,
+                feedback: feedback,
+                checkedItems: checkedItems)
+            try await self.submit(result)
+        }
         let host = UIHostingController(rootView: view)
         host.modalPresentationStyle = .pageSheet
         menuController = host
@@ -126,14 +151,13 @@ public final class SaaSSessionManager {
     private func handleInterruption() async {
         guard isActive, !awaitingFeedback else { return }
         awaitingFeedback = true
-        interrupted = true
         let taskID = UIApplication.shared.beginBackgroundTask(withName: "BuildBarber.finalize")
         pendingVideoURL = await recorder.stop()
         if taskID != .invalid { UIApplication.shared.endBackgroundTask(taskID) }
 
         let content = UNMutableNotificationContent()
         content.title = "Session paused"
-        content.body = "Your session was paused. Tap here to provide feedback and upload your session."
+        content.body = "Your session was paused. Tap here to provide feedback and submit your result."
         content.sound = .default
         let request = UNNotificationRequest(identifier: "com.buildbarber.sdk.paused", content: content, trigger: nil)
         try? await UNUserNotificationCenter.current().add(request)
@@ -147,8 +171,15 @@ public final class SaaSSessionManager {
 
     // MARK: Completion
 
-    private func endSession() async {
+    private func submit(_ result: BuildBarberTestResult) async throws {
         guard isActive, let configuration else { return }
+        try await configuration.client.submitTestResult(result)
+        dismissMenu()
+        await finishSession()
+    }
+
+    private func finishSession() async {
+        guard isActive else { return }
         isActive = false
         stopObserving()
         overlay?.hide()
@@ -156,31 +187,8 @@ public final class SaaSSessionManager {
         let videoURL: URL? = if awaitingFeedback { pendingVideoURL } else { await recorder.stop() }
         pendingVideoURL = nil
         awaitingFeedback = false
-
-        let device = UIDevice.current
-        let info = Bundle.main.infoDictionary
-        let payload = SessionPayload(
-            checklist: model.items,
-            feedback: model.feedback,
-            metadata: .init(
-                sessionID: sessionID,
-                startedAt: startedAt,
-                endedAt: Date(),
-                wasInterruptedByBackground: interrupted,
-                appBundleID: Bundle.main.bundleIdentifier ?? "",
-                appVersion: info?["CFBundleShortVersionString"] as? String ?? "",
-                osVersion: device.systemVersion,
-                deviceModel: device.model))
-        let uploader = SessionUploader(apiKey: configuration.apiKey, endpoint: configuration.endpoint)
-
-        let taskID = UIApplication.shared.beginBackgroundTask(withName: "BuildBarber.upload")
-        do {
-            try await uploader.upload(payload: payload, videoURL: videoURL)
-            if let videoURL { try? FileManager.default.removeItem(at: videoURL) }
-        } catch {
-            // Keep the file on failure so the host can retry later.
-        }
-        if taskID != .invalid { UIApplication.shared.endBackgroundTask(taskID) }
+        if let videoURL { try? FileManager.default.removeItem(at: videoURL) }
+        currentTest = nil
     }
 }
 #endif

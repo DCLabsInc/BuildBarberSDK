@@ -18,6 +18,52 @@ public struct BuildBarberConfiguration: Sendable {
     }
 }
 
+public enum BuildBarberTestType: String, Codable, Sendable {
+    case feature = "Feature"
+    case release = "Release"
+}
+
+public struct BuildBarberTest: Decodable, Sendable {
+    public struct ChecklistItem: Decodable, Sendable {
+        public let key: String
+        public let label: String
+        public let kind: String
+    }
+
+    public let title: String
+    public let instructions: String
+    public let checklist: [ChecklistItem]
+    public let showPassFailButtons: Bool
+}
+
+public struct BuildBarberTestResult: Encodable, Sendable {
+    public let testType: BuildBarberTestType
+    public let codeword: String
+    public let testerEmail: String
+    public let outcome: String?
+    public let feedback: String
+    public let checkedItems: [String]
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(testType, forKey: .testType)
+        try container.encode(codeword, forKey: .codeword)
+        try container.encode(testerEmail, forKey: .testerEmail)
+        try container.encodeIfPresent(outcome, forKey: .outcome)
+        try container.encode(feedback, forKey: .feedback)
+        try container.encode(checkedItems, forKey: .checkedItems)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case testType
+        case codeword
+        case testerEmail
+        case outcome
+        case feedback
+        case checkedItems
+    }
+}
+
 /// Error body returned by the API: `{ "error": "<code>", "message": "<text>" }`.
 public struct APIErrorBody: Codable, Sendable, Equatable {
     public let error: String
@@ -87,5 +133,26 @@ public struct BuildBarberClient: Sendable {
     ) async throws -> Response {
         let data = try await send(method: "POST", path: path, body: try JSONEncoder().encode(body))
         return try JSONDecoder().decode(Response.self, from: data)
+    }
+
+    public func fetchTest(type: BuildBarberTestType, codeword: String) async throws -> BuildBarberTest {
+        try await get(Self.testPath(type: type, codeword: codeword))
+    }
+
+    public func submitTestResult(_ result: BuildBarberTestResult) async throws {
+        _ = try await send(
+            method: "POST",
+            path: "/tests/results",
+            body: try JSONEncoder().encode(result))
+    }
+
+    static func testPath(type: BuildBarberTestType, codeword: String) throws -> String {
+        var components = URLComponents()
+        components.queryItems = [
+            URLQueryItem(name: "testType", value: type.rawValue),
+            URLQueryItem(name: "codeword", value: codeword)
+        ]
+        guard let query = components.percentEncodedQuery else { throw BuildBarberError.invalidURL }
+        return "/tests?\(query)"
     }
 }
