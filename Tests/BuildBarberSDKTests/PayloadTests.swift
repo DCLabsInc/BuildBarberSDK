@@ -23,15 +23,6 @@ import Foundation
         #expect(req.value(forHTTPHeaderField: "X-Api-Key") == "k123")
     }
 
-    @Test func testLookupUsesTypeAndEscapedCodeword() throws {
-        let client = BuildBarberClient(configuration: .init(apiKey: "k123"))
-        let path = try BuildBarberClient.testPath(type: .feature, codeword: "hello world")
-        let request = try client.makeRequest(
-            method: "GET",
-            path: path)
-        #expect(request.url?.absoluteString == "https://portal.buildbarber.com/api/sdk/v1/tests?testType=Feature&codeword=hello%20world")
-    }
-
     @Test func feedbackOnlyResultOmitsOutcome() throws {
         let result = BuildBarberTestResult(
             testType: .release,

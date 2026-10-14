@@ -135,24 +135,10 @@ public struct BuildBarberClient: Sendable {
         return try JSONDecoder().decode(Response.self, from: data)
     }
 
-    public func fetchTest(type: BuildBarberTestType, codeword: String) async throws -> BuildBarberTest {
-        try await get(Self.testPath(type: type, codeword: codeword))
-    }
-
     public func submitTestResult(_ result: BuildBarberTestResult) async throws {
         _ = try await send(
             method: "POST",
             path: "/tests/results",
             body: try JSONEncoder().encode(result))
-    }
-
-    static func testPath(type: BuildBarberTestType, codeword: String) throws -> String {
-        var components = URLComponents()
-        components.queryItems = [
-            URLQueryItem(name: "testType", value: type.rawValue),
-            URLQueryItem(name: "codeword", value: codeword)
-        ]
-        guard let query = components.percentEncodedQuery else { throw BuildBarberError.invalidURL }
-        return "/tests?\(query)"
     }
 }
