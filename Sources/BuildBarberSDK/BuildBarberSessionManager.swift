@@ -1,11 +1,12 @@
 #if canImport(UIKit) && canImport(ScreenCaptureKit)
+import Combine
 import SwiftUI
 import UIKit
 import UserNotifications
 
 /// Entry point of the SDK.
 @MainActor
-public final class BuildBarberSessionManager {
+public final class BuildBarberSessionManager: ObservableObject {
     public static let shared = BuildBarberSessionManager()
 
     private struct Configuration {
@@ -17,6 +18,7 @@ public final class BuildBarberSessionManager {
 
     private var configuration: Configuration?
     private var currentTest: BuildBarberTest?
+    @Published private var checkedItems = Set<String>()
     private let recorder = ScreenRecorder()
     private var overlay: FloatingOverlay?
     private var menuController: UIViewController?
@@ -43,10 +45,31 @@ public final class BuildBarberSessionManager {
             checklistItems: checklistItems)
     }
 
+    /// Automatically ticks a configured checklist item during an active session.
+    /// The index is zero-based and refers to the order of `checklistItems` passed to `configure`.
+    public func tickChecklistItem(at index: Int) {
+        guard isActive,
+              let configuration,
+              configuration.checklistItems.indices.contains(index)
+        else { return }
+        checkedItems.insert(configuration.checklistItems[index])
+    }
+
+    var checkedChecklistItemKeys: Set<String> { checkedItems }
+
+    func toggleChecklistItem(key: String) {
+        if checkedItems.contains(key) {
+            checkedItems.remove(key)
+        } else {
+            checkedItems.insert(key)
+        }
+    }
+
     // MARK: Session start
 
     public func startSession(presentingFrom viewController: UIViewController) {
         guard let configuration, !isActive else { return }
+        checkedItems.removeAll()
         currentTest = BuildBarberTest(
             title: "Test session",
             instructions: "Tick each item as you complete it, then submit your result.",
@@ -96,7 +119,7 @@ public final class BuildBarberSessionManager {
     private func presentMenu() {
         guard menuController == nil, let presenter = overlay?.presenter else { return }
         guard let test = currentTest else { return }
-        let view = ChecklistMenuView(test: test) { [weak self] outcome, email, feedback, checkedItems in
+        let view = ChecklistMenuView(test: test, sessionManager: self) { [weak self] outcome, email, feedback, checkedItems in
             guard let self, let configuration = self.configuration else { return }
             let result = BuildBarberTestResult(
                 testType: configuration.testType,
@@ -175,6 +198,7 @@ public final class BuildBarberSessionManager {
         let videoURL: URL? = if awaitingFeedback { pendingVideoURL } else { await recorder.stop() }
         pendingVideoURL = nil
         awaitingFeedback = false
+        checkedItems.removeAll()
         if let videoURL { try? FileManager.default.removeItem(at: videoURL) }
         currentTest = nil
     }

@@ -3,16 +3,16 @@ import SwiftUI
 
 struct ChecklistMenuView: View {
     let test: BuildBarberTest
+    @ObservedObject var sessionManager: BuildBarberSessionManager
     let onSubmit: (String?, String, String, [String]) async throws -> Void
 
-    @State private var checkedItems = Set<String>()
     @State private var testerEmail = ""
     @State private var feedback = ""
     @State private var isSubmitting = false
     @State private var submissionError: String?
 
     private var allItemsChecked: Bool {
-        test.checklist.allSatisfy { checkedItems.contains($0.key) }
+        test.checklist.allSatisfy { sessionManager.checkedChecklistItemKeys.contains($0.key) }
     }
 
     var body: some View {
@@ -24,13 +24,9 @@ struct ChecklistMenuView: View {
 
                 List(test.checklist, id: \.key) { item in
                     Button {
-                        if checkedItems.contains(item.key) {
-                            checkedItems.remove(item.key)
-                        } else {
-                            checkedItems.insert(item.key)
-                        }
+                        sessionManager.toggleChecklistItem(key: item.key)
                     } label: {
-                        Label(item.label, systemImage: checkedItems.contains(item.key) ? "checkmark.square.fill" : "square")
+                        Label(item.label, systemImage: sessionManager.checkedChecklistItemKeys.contains(item.key) ? "checkmark.square.fill" : "square")
                             .foregroundStyle(.primary)
                     }
                 }
@@ -89,7 +85,7 @@ struct ChecklistMenuView: View {
                     outcome,
                     testerEmail,
                     feedback,
-                    test.checklist.filter { checkedItems.contains($0.key) }.map(\.key))
+                    test.checklist.filter { sessionManager.checkedChecklistItemKeys.contains($0.key) }.map(\.key))
             } catch {
                 submissionError = "The result could not be submitted. Please try again."
                 isSubmitting = false
