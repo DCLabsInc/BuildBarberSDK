@@ -101,9 +101,6 @@ final class ScreenRecorder: NSObject {
         let filter = try await pickContent()
         let config = SCStreamConfiguration()
         config.capturesAudio = true
-        config.showsCursor = false
-        config.minimumFrameInterval = CMTime(value: 1, timescale: 30)
-        config.queueDepth = 6
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("session-\(UUID().uuidString).mp4")
