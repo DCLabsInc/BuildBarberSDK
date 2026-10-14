@@ -33,7 +33,7 @@ final class FeedbackViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        SaaSSessionManager.shared.configure(
+        BuildBarberSessionManager.shared.configure(
             apiKey: "YOUR_CLIENT_API_KEY",
             testType: .feature,
             codeword: "YOUR_CODEWORD"
@@ -41,7 +41,7 @@ final class FeedbackViewController: UIViewController {
     }
 
     func startFeedbackSession() {
-        SaaSSessionManager.shared.startSession(presentingFrom: self)
+        BuildBarberSessionManager.shared.startSession(presentingFrom: self)
     }
 }
 ```

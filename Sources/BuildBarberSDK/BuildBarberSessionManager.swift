@@ -5,8 +5,8 @@ import UserNotifications
 
 /// Entry point of the SDK.
 @MainActor
-public final class SaaSSessionManager {
-    public static let shared = SaaSSessionManager()
+public final class BuildBarberSessionManager {
+    public static let shared = BuildBarberSessionManager()
 
     private struct Configuration {
         let client: BuildBarberClient
