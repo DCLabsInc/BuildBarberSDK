@@ -22,7 +22,8 @@ Select the `BuildBarberSDK` library for your app target.
 
 Configure the shared session manager before offering the session flow to users.
 Use an API key appropriate for a client app (never embed a privileged server
-secret), and provide the test type and codeword supplied by BuildBarber.
+secret), and provide the test type and codeword supplied by BuildBarber,
+along with the checklist items to show testers.
 The test type is `.feature` or `.release`.
 
 ```swift
@@ -36,7 +37,12 @@ final class FeedbackViewController: UIViewController {
         BuildBarberSessionManager.shared.configure(
             apiKey: "YOUR_CLIENT_API_KEY",
             testType: .feature,
-            codeword: "YOUR_CODEWORD"
+            codeword: "YOUR_CODEWORD",
+            checklistItems: [
+                "Sign in",
+                "Add a dog walk",
+                "Review walk history"
+            ]
         )
     }
 
@@ -52,44 +58,16 @@ picker; recording begins only after the user selects what to share. The SDK
 records screen and audio, and displays a floating button for opening the session
 menu.
 
-## How checklist tick boxes are pulled from the API
+## Checklist items
 
-When a session starts, the SDK fetches the configured test from BuildBarber:
-
-- `GET https://portal.buildbarber.com/api/sdk/v1/tests?testType=<type>&codeword=<codeword>`
-- Header: `X-Api-Key: <your key>`
-
-From the response, the SDK renders:
-
-- `title`, `description`, and `instructions`
-- each entry in `checklist` as a tick box
-  - `key` = stable identifier used when submitting results
-  - `label` = text shown next to the tick box
-  - `kind` = source type (`task` for feature tests, `feature` for release tests)
-
-The SDK submits checked items using checklist **keys** (not labels).
-
-## Auto-tick checklist items from app events
-
-You can mark checklist items as completed from your app when a known action
-happens. Use the item index from the fetched checklist.
-
-```swift
-// Example: auto-tick the first checklist item when the user completes Dog walks
-BuildBarberSessionManager.shared.updateChecklist(itemIndex: 0, isTicked: true)
-```
-
-This lets your app reflect completed tasks/features automatically while still
-allowing testers to review and submit from the SDK UI.
+Checklist items are provided statically through the `checklistItems` argument of
+`BuildBarberSessionManager.shared.configure(...)`. They are **not** pulled
+dynamically from the BuildBarber API. Each item is shown to the tester as a tick
+box, and the item text is submitted as the checked item identifier.
 
 ## Submission behavior
 
-The SDK follows the test definition returned by BuildBarber:
-
-- If `showPassFailButtons == true`, the user sees **Pass** and **Fail**.
-- If `showPassFailButtons == false`, the user sees **Submit feedback** only.
-
-Validation is enforced before submission:
+The session menu shows **Pass** and **Fail** buttons. Validation is enforced before submission:
 
 - Pass requires all checklist items to be ticked.
 - Fail requires feedback text.
@@ -101,11 +79,5 @@ On submit, the SDK posts results to:
 
 Payload includes test type, codeword, tester email, optional outcome,
 optional feedback, and checked checklist keys.
-
-## Error handling
-
-If the test fetch fails, the SDK shows an error state to the tester.
-A `404 test_not_found` typically means the codeword is wrong for the selected
-`testType` or API key scope.
 
 Never log or expose your API key in client-side diagnostics.

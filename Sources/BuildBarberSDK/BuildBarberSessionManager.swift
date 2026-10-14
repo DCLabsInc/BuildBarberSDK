@@ -12,6 +12,7 @@ public final class BuildBarberSessionManager {
         let client: BuildBarberClient
         let testType: BuildBarberTestType
         let codeword: String
+        let checklistItems: [String]
     }
 
     private var configuration: Configuration?
@@ -21,7 +22,6 @@ public final class BuildBarberSessionManager {
     private var menuController: UIViewController?
     private var pendingVideoURL: URL?
     private var awaitingFeedback = false
-    private var isLoadingTest = false
     private var backgroundObserver: NSObjectProtocol?
     private var foregroundObserver: NSObjectProtocol?
     private var isActive = false
@@ -30,37 +30,31 @@ public final class BuildBarberSessionManager {
 
     // MARK: Configuration
 
-    public func configure(apiKey: String, testType: BuildBarberTestType, codeword: String) {
+    public func configure(
+        apiKey: String,
+        testType: BuildBarberTestType,
+        codeword: String,
+        checklistItems: [String]
+    ) {
         configuration = Configuration(
             client: BuildBarberClient(configuration: BuildBarberConfiguration(apiKey: apiKey)),
             testType: testType,
-            codeword: codeword)
+            codeword: codeword,
+            checklistItems: checklistItems)
     }
 
     // MARK: Session start
 
     public func startSession(presentingFrom viewController: UIViewController) {
-        guard let configuration, !isActive, !isLoadingTest else { return }
-        isLoadingTest = true
-        Task {
-            defer { isLoadingTest = false }
-            do {
-                currentTest = try await configuration.client.fetchTest(
-                    type: configuration.testType,
-                    codeword: configuration.codeword)
-                presentConfirmation(from: viewController)
-            } catch {
-                let message: String
-                if let apiError = error as? BuildBarberError,
-                   case let .api(_, body) = apiError,
-                   body.error == "test_not_found" {
-                    message = "The test could not be found. Check the codeword and try again."
-                } else {
-                    message = "The test could not be loaded. Please try again."
-                }
-                showError(message, from: viewController)
-            }
-        }
+        guard let configuration, !isActive else { return }
+        currentTest = BuildBarberTest(
+            title: "Test session",
+            instructions: "Tick each item as you complete it, then submit your result.",
+            checklist: configuration.checklistItems.map {
+                BuildBarberTest.ChecklistItem(key: $0, label: $0, kind: "task")
+            },
+            showPassFailButtons: true)
+        presentConfirmation(from: viewController)
     }
 
     private func presentConfirmation(from viewController: UIViewController) {
@@ -72,12 +66,6 @@ public final class BuildBarberSessionManager {
         alert.addAction(UIAlertAction(title: "Confirm", style: .default) { [weak self] _ in
             Task { @MainActor in await self?.beginRecording(from: viewController) }
         })
-        viewController.present(alert, animated: true)
-    }
-
-    private func showError(_ message: String, from viewController: UIViewController) {
-        let alert = UIAlertController(title: "Unable to load test", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
         viewController.present(alert, animated: true)
     }
 
