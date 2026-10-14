@@ -23,6 +23,29 @@ import Foundation
         #expect(req.value(forHTTPHeaderField: "X-Api-Key") == "k123")
     }
 
+    @Test func testLookupUsesTypeAndEscapedCodeword() throws {
+        let client = BuildBarberClient(configuration: .init(apiKey: "k123"))
+        let path = try BuildBarberClient.testPath(type: .feature, codeword: "hello world")
+        let request = try client.makeRequest(
+            method: "GET",
+            path: path)
+        #expect(request.url?.absoluteString == "https://portal.buildbarber.com/api/sdk/v1/tests?testType=Feature&codeword=hello%20world")
+    }
+
+    @Test func feedbackOnlyResultOmitsOutcome() throws {
+        let result = BuildBarberTestResult(
+            testType: .release,
+            codeword: "code",
+            testerEmail: "tester@example.com",
+            outcome: nil,
+            feedback: "Feedback",
+            checkedItems: ["check-1"])
+        let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any])
+        #expect(json["testType"] as? String == "Release")
+        #expect(json["checkedItems"] as? [String] == ["check-1"])
+        #expect(json["outcome"] == nil)
+    }
+
     @Test func errorBodyDecodes() throws {
         let body = try JSONDecoder().decode(APIErrorBody.self, from: Data(#"{"error":"bad_key","message":"nope"}"#.utf8))
         #expect(body.error == "bad_key")
