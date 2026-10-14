@@ -14,3 +14,17 @@ import Foundation
         #expect(form.contentType == "multipart/form-data; boundary=B")
     }
 }
+
+@Suite struct ClientTests {
+    @Test func requestUsesPortalHostPathAndApiKey() throws {
+        let client = BuildBarberClient(configuration: .init(apiKey: "k123"))
+        let req = try client.makeRequest(method: "GET", path: "/tests?limit=5")
+        #expect(req.url?.absoluteString == "https://portal.buildbarber.com/api/sdk/v1/tests?limit=5")
+        #expect(req.value(forHTTPHeaderField: "X-Api-Key") == "k123")
+    }
+
+    @Test func errorBodyDecodes() throws {
+        let body = try JSONDecoder().decode(APIErrorBody.self, from: Data(#"{"error":"bad_key","message":"nope"}"#.utf8))
+        #expect(body.error == "bad_key")
+    }
+}
