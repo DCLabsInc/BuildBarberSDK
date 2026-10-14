@@ -28,7 +28,7 @@ struct SessionUploader: Sendable {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue(form.contentType, forHTTPHeaderField: "Content-Type")
-        request.setValue("******", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
 
         let (_, response) = try await session.upload(for: request, from: form.finalized())
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
