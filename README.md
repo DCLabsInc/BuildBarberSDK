@@ -65,6 +65,22 @@ Checklist items are provided statically through the `checklistItems` argument of
 dynamically from the BuildBarber API. Each item is shown to the tester as a tick
 box, and the item text is submitted as the checked item identifier.
 
+To tick an item automatically when the corresponding action completes in your
+app, call `tickChecklistItem(at:)` on the shared session manager. The index is
+zero-based and matches the item's position in the `checklistItems` array passed
+to `configure`:
+
+```swift
+// checklistItems: ["Sign in", "Add a dog walk", "Review walk history"]
+func didAddDogWalk() {
+    BuildBarberSessionManager.shared.tickChecklistItem(at: 1)
+}
+```
+
+Call this while a session is active. Invalid indices and calls outside an active
+session are ignored. The tester can still manually untick an automatically
+checked item in the session menu.
+
 ## Submission behavior
 
 The session menu shows **Pass** and **Fail** buttons. Validation is enforced before submission:
