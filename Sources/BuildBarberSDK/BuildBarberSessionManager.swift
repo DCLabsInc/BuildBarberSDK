@@ -82,12 +82,13 @@ public final class BuildBarberSessionManager: ObservableObject {
     }
 
     private func presentConfirmation(from viewController: UIViewController) {
+        let items = (currentTest?.checklist ?? []).map { "• \($0.label)" }.joined(separator: "\n")
         let alert = UIAlertController(
-            title: "Record this session?",
-            message: "This session will record your screen and audio while you test. Recording only starts after you confirm and select what to share. Submit your result from the session menu when finished.",
+            title: "Test session",
+            message: "Please test the following items:\n\n\(items)\n\nThen tap the icon at the top of the screen to complete your test. Screen recording will begin when you start the test and be sent with the test feedback. Thanks again for helping us test and improve the app!",
             preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Confirm", style: .default) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: "Start", style: .default) { [weak self] _ in
             Task { @MainActor in await self?.beginRecording(from: viewController) }
         })
         viewController.present(alert, animated: true)
@@ -98,7 +99,14 @@ public final class BuildBarberSessionManager: ObservableObject {
             _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
             try await recorder.start()
         } catch {
-            return // user cancelled the picker or permission was denied
+            if case RecorderError.cancelled = error { return }
+            let alert = UIAlertController(
+                title: "Couldn't start recording",
+                message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))",
+                preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            Self.topMost(from: viewController).present(alert, animated: true)
+            return
         }
         isActive = true
         awaitingFeedback = false
@@ -169,6 +177,8 @@ public final class BuildBarberSessionManager: ObservableObject {
     // MARK: Menu
 
     private func presentMenu() {
+        // A swipe-dismissed sheet leaves a stale reference behind.
+        if let menu = menuController, menu.presentingViewController == nil { menuController = nil }
         guard menuController == nil, let presenter = overlay?.presenter else { return }
         guard let test = currentTest else { return }
         let view = ChecklistMenuView(test: test, sessionManager: self) { [weak self] outcome, email, feedback, checkedItems in
