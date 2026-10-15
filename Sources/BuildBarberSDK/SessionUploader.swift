@@ -3,10 +3,6 @@ import Foundation
 import FoundationNetworking
 #endif
 
-public enum UploadError: Error, Sendable {
-    case badStatus(Int)
-}
-
 /// Uploads the session payload and video as multipart/form-data.
 struct SessionUploader: Sendable {
     let apiKey: String
@@ -37,9 +33,16 @@ struct SessionUploader: Sendable {
 
     func upload<Payload: Encodable>(payload: Payload, videoURL: URL?) async throws {
         let (request, body) = try makeUploadRequest(payload: payload, videoURL: videoURL)
-        let (_, response) = try await session.upload(for: request, from: body)
+        let (data, response) = try await session.upload(for: request, from: body)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw UploadError.badStatus(http.statusCode)
+            throw Self.error(statusCode: http.statusCode, responseBody: data)
         }
+    }
+
+    static func error(statusCode: Int, responseBody: Data) -> BuildBarberError {
+        if let apiError = try? JSONDecoder().decode(APIErrorBody.self, from: responseBody) {
+            return .api(status: statusCode, body: apiError)
+        }
+        return .badStatus(statusCode)
     }
 }

@@ -47,9 +47,11 @@ struct ChecklistMenuView: View {
                             testerEmail = email
                             UserDefaults.standard.set(email, forKey: Self.appleEmailDefaultsKey)
                             signInError = nil
+                        } else if testerEmail.isEmpty {
+                            signInError = "Apple did not provide an email address. Enter it below to continue."
                         }
-                    case .failure:
-                        signInError = "Sign in with Apple was unsuccessful. Please try again."
+                    case .failure(let error):
+                        signInError = error.localizedDescription
                     }
                 }
                 .signInWithAppleButtonStyle(.black)
@@ -118,7 +120,7 @@ struct ChecklistMenuView: View {
                     feedback,
                     test.checklist.filter { sessionManager.checkedChecklistItemKeys.contains($0.key) }.map(\.key))
             } catch {
-                submissionError = "The result could not be submitted. Please try again."
+                submissionError = error.localizedDescription
                 isSubmitting = false
             }
         }
