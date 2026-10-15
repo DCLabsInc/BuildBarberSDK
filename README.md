@@ -1,4 +1,4 @@
-# BuildBarberSDK
+# BuildBarber SDK
 
 BuildBarberSDK lets an iOS app collect a screen recording, checklist status, and
 user feedback for a test session so it will all appear in the BuildBarber portal.
@@ -95,7 +95,7 @@ capability for their app target in Xcode. Swift Package Manager libraries cannot
 add this app entitlement. Apple may only provide the tester's email on the first
 authorization.
 
-On submit, the SDK posts results to:
+On submit, the SDK will post results to:
 
 - `POST https://portal.buildbarber.com/api/sdk/v1/tests/results`
 
