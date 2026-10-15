@@ -44,6 +44,13 @@ import Foundation
         #expect(body.range(of: Data("filename=\"\(videoURL.lastPathComponent)\"".utf8)) != nil)
         #expect(body.range(of: Data("video-data".utf8)) != nil)
     }
+
+    @Test func uploadErrorsIncludeAPIResponseMessage() {
+        let error = SessionUploader.error(
+            statusCode: 400,
+            responseBody: Data(#"{"error":"invalid_result","message":"Missing codeword."}"#.utf8))
+        #expect(error.localizedDescription == "Missing codeword.")
+    }
 }
 
 @Suite struct ClientTests {
@@ -71,5 +78,13 @@ import Foundation
     @Test func errorBodyDecodes() throws {
         let body = try JSONDecoder().decode(APIErrorBody.self, from: Data(#"{"error":"bad_key","message":"nope"}"#.utf8))
         #expect(body.error == "bad_key")
+    }
+
+    @Test func requestErrorsExposeActionableMessages() {
+        #expect(BuildBarberError.api(
+            status: 400,
+            body: APIErrorBody(error: "invalid_result", message: "Missing codeword.")
+        ).localizedDescription == "Missing codeword.")
+        #expect(BuildBarberError.badStatus(500).localizedDescription == "The request failed (HTTP 500).")
     }
 }

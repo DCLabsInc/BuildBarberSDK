@@ -70,10 +70,21 @@ public struct APIErrorBody: Codable, Sendable, Equatable {
     public let message: String?
 }
 
-public enum BuildBarberError: Error, Sendable, Equatable {
+public enum BuildBarberError: Error, LocalizedError, Sendable, Equatable {
     case invalidURL
     case api(status: Int, body: APIErrorBody)
     case badStatus(Int)
+
+    public var errorDescription: String? {
+        switch self {
+        case .invalidURL:
+            "The request URL is invalid."
+        case let .api(status, body):
+            body.message ?? "The request failed (HTTP \(status))."
+        case let .badStatus(status):
+            "The request failed (HTTP \(status))."
+        }
+    }
 }
 
 /// Minimal client for `/api/sdk/v1`. JSON is camelCase in both directions.
