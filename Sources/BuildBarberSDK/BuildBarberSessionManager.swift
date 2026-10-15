@@ -195,19 +195,22 @@ public final class BuildBarberSessionManager: ObservableObject {
     }
 
     private func saveToCameraRoll(_ url: URL) async {
-        let authorizationStatus = await withCheckedContinuation { continuation in
-            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
-                continuation.resume(returning: status)
-            }
+        await Self.saveVideoToPhotoLibrary(url)
+    }
+
+    // Nonisolated so Photos' callbacks, which run on its own queues, are not main-actor isolated.
+    private nonisolated static func saveVideoToPhotoLibrary(_ url: URL) async {
+        let status = await withCheckedContinuation { (continuation: CheckedContinuation<PHAuthorizationStatus, Never>) in
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { continuation.resume(returning: $0) }
         }
-        guard authorizationStatus == .authorized else { return }
+        guard status == .authorized else { return }
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             PHPhotoLibrary.shared().performChanges({
                 _ = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
-            }) { _, _ in
+            }, completionHandler: { _, _ in
                 continuation.resume()
-            }
+            })
         }
     }
 
