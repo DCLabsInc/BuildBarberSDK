@@ -195,9 +195,19 @@ public final class BuildBarberSessionManager: ObservableObject {
     }
 
     private func saveToCameraRoll(_ url: URL) async {
-        guard await PHPhotoLibrary.requestAuthorization(for: .addOnly) == .authorized else { return }
-        try? await PHPhotoLibrary.shared().performChanges {
-            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+        let authorizationStatus = await withCheckedContinuation { continuation in
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                continuation.resume(returning: status)
+            }
+        }
+        guard authorizationStatus == .authorized else { return }
+
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            PHPhotoLibrary.shared().performChanges({
+                _ = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+            }) { _, _ in
+                continuation.resume()
+            }
         }
     }
 
