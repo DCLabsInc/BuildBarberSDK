@@ -16,6 +16,7 @@ struct ChecklistMenuView: View {
     @State private var submissionError: String?
     @State private var errorDetails: String?
     @State private var showingErrorDetails = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -118,6 +119,11 @@ struct ChecklistMenuView: View {
             }
             .navigationTitle(test.title)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("X") { dismiss() }
+                }
+            }
             .alert("Error submitting feedback", isPresented: $showingErrorDetails) {
                 Button("Copy to clipboard") {
                     UIPasteboard.general.string = errorDetails
