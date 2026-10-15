@@ -142,7 +142,7 @@ final class ScreenRecorder: NSObject {
         }
     }
 
-    private func resolvePicker(_ result: Result<SCContentFilter, Error>) {
+    private func resolvePicker(_ result: sending Result<SCContentFilter, Error>) {
         pickerContinuation?.resume(with: result)
         pickerContinuation = nil
     }
