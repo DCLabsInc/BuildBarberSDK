@@ -29,6 +29,8 @@ public final class BuildBarberSessionManager: ObservableObject {
     private var foregroundObserver: NSObjectProtocol?
     private var isActive = false
     private var limitTask: Task<Void, Never>?
+    private let shakeDetector = ShakeDetector()
+    private var isShowingRepeatPrompt = false
     public init() {}
 
     // MARK: Configuration
@@ -44,6 +46,31 @@ public final class BuildBarberSessionManager: ObservableObject {
             testType: testType,
             codeword: codeword,
             checklistItems: checklistItems)
+        shakeDetector.start { [weak self] in self?.handleShake() }
+    }
+
+    private func handleShake() {
+        guard configuration != nil, !isActive, !isShowingRepeatPrompt,
+              let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive }),
+              let window = scene.windows.first(where: { !($0 is PassthroughWindow) && $0.isKeyWindow })
+                ?? scene.windows.first(where: { !($0 is PassthroughWindow) }),
+              let root = window.rootViewController
+        else { return }
+        let presenter = Self.topMost(from: root)
+        if presenter is UIAlertController { return }
+
+        isShowingRepeatPrompt = true
+        let alert = UIAlertController(title: "Perform another test?", message: nil, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "No", style: .cancel) { [weak self] _ in
+            self?.isShowingRepeatPrompt = false
+        })
+        alert.addAction(UIAlertAction(title: "Yes", style: .default) { [weak self] _ in
+            guard let self else { return }
+            self.isShowingRepeatPrompt = false
+            self.startSession(presentingFrom: presenter, ignoringPreviousCompletion: true)
+        })
+        presenter.present(alert, animated: true)
     }
 
     /// Automatically ticks a configured checklist item during an active session.
@@ -69,7 +96,13 @@ public final class BuildBarberSessionManager: ObservableObject {
     // MARK: Session start
 
     public func startSession(presentingFrom viewController: UIViewController) {
-        guard let configuration, !isActive, !hasCompletedTest(configuration) else { return }
+        startSession(presentingFrom: viewController, ignoringPreviousCompletion: false)
+    }
+
+    private func startSession(presentingFrom viewController: UIViewController, ignoringPreviousCompletion: Bool) {
+        guard let configuration, !isActive,
+              ignoringPreviousCompletion || !hasCompletedTest(configuration)
+        else { return }
         checkedItems.removeAll()
         Task { @MainActor in
             // If the definition can't be fetched, fall back to the feedback-only flow.
