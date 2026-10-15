@@ -17,10 +17,6 @@ struct ChecklistMenuView: View {
     @State private var errorDetails: String?
     @State private var showingErrorDetails = false
 
-    private var allItemsChecked: Bool {
-        test.checklist.allSatisfy { sessionManager.checkedChecklistItemKeys.contains($0.key) }
-    }
-
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
@@ -103,7 +99,7 @@ struct ChecklistMenuView: View {
                             submit(outcome: "pass")
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(!allItemsChecked || isSubmitting)
+                        .disabled(isSubmitting)
 
                         Button("Fail") {
                             submit(outcome: "fail")
