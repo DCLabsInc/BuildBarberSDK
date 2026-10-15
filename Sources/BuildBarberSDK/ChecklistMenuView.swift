@@ -105,7 +105,7 @@ struct ChecklistMenuView: View {
                             submit(outcome: "fail")
                         }
                         .buttonStyle(.bordered)
-                        .disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
+                        .disabled(isSubmitting)
                     } else {
                         Button("Submit feedback") {
                             submit(outcome: nil)
@@ -134,10 +134,13 @@ struct ChecklistMenuView: View {
         submissionError = nil
         Task {
             do {
+                // The server requires feedback text when failing a test.
+                let trimmed = feedback.trimmingCharacters(in: .whitespacesAndNewlines)
+                let text = trimmed.isEmpty && outcome == "fail" ? "No feedback provided" : feedback
                 try await onSubmit(
                     outcome,
                     testerEmail,
-                    feedback,
+                    text,
                     test.checklist.filter { sessionManager.checkedChecklistItemKeys.contains($0.key) }.map(\.key))
             } catch {
                 submissionError = error.localizedDescription
