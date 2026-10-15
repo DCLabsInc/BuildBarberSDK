@@ -18,6 +18,18 @@ https://github.com/DCLabsInc/BuildBarberSDK
 
 Select the `BuildBarberSDK` library for your app target.
 
+> [!IMPORTANT]
+> **Sign in with Apple is required.** Enable the **Sign in with Apple**
+> capability on your app target in Xcode (and its App ID). Swift Package Manager
+> libraries cannot add this entitlement for you.
+
+> [!IMPORTANT]
+> **Camera roll access is required to save the recording.** Add
+> `NSPhotoLibraryAddUsageDescription` to your app's Info.plist (for example,
+> "Save your feedback session recording to Photos"). The SDK asks for add-only
+> Photos permission and saves the video to the camera roll after a successful
+> submission.
+
 ## Configure and start a session
 
 Configure the shared session manager before offering the session flow to users.
@@ -103,5 +115,9 @@ On submit, the SDK will post results to:
 Payload includes test type, codeword, tester email, optional outcome,
 optional feedback, and checked checklist keys. The session recording, when
 available, is uploaded with the result.
+
+If submission fails, the SDK shows an alert with the full error text and a
+**Copy to clipboard** button. If the server answers a video upload with HTTP 415,
+the SDK retries by submitting the result as plain JSON without the video.
 
 Never log or expose your API key in client-side diagnostics.

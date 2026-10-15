@@ -1,5 +1,6 @@
 #if canImport(UIKit) && canImport(ScreenCaptureKit)
 import Combine
+import Photos
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -188,8 +189,16 @@ public final class BuildBarberSessionManager: ObservableObject {
             pendingVideoURL = await recorder.stop()
         }
         try await configuration.client.submitTestResult(result, videoURL: pendingVideoURL)
+        if let videoURL = pendingVideoURL { await saveToCameraRoll(videoURL) }
         dismissMenu()
         await finishSession()
+    }
+
+    private func saveToCameraRoll(_ url: URL) async {
+        guard await PHPhotoLibrary.requestAuthorization(for: .addOnly) == .authorized else { return }
+        try? await PHPhotoLibrary.shared().performChanges {
+            PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+        }
     }
 
     private func finishSession() async {

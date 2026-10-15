@@ -40,9 +40,6 @@ struct SessionUploader: Sendable {
     }
 
     static func error(statusCode: Int, responseBody: Data) -> BuildBarberError {
-        if let apiError = try? JSONDecoder().decode(APIErrorBody.self, from: responseBody) {
-            return .api(status: statusCode, body: apiError)
-        }
-        return .badStatus(statusCode)
+        BuildBarberError.make(statusCode: statusCode, responseBody: responseBody)
     }
 }
