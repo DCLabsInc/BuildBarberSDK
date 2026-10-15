@@ -51,7 +51,12 @@ struct ChecklistMenuView: View {
                             signInError = "Apple did not provide an email address. Enter it below to continue."
                         }
                     case .failure(let error):
-                        signInError = error.localizedDescription
+                        if let authorizationError = error as? ASAuthorizationError,
+                           authorizationError.code == .unknown {
+                            signInError = "Sign in with Apple failed. Check that the host app has the Sign in with Apple capability enabled."
+                        } else {
+                            signInError = error.localizedDescription
+                        }
                     }
                 }
                 .signInWithAppleButtonStyle(.black)
