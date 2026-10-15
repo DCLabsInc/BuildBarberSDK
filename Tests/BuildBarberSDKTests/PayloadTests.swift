@@ -61,6 +61,25 @@ import Foundation
         #expect(req.value(forHTTPHeaderField: "X-Api-Key") == "k123")
     }
 
+    @Test func resultWithoutVideoUsesJSONRequest() throws {
+        let client = BuildBarberClient(configuration: .init(apiKey: "k123"))
+        let result = BuildBarberTestResult(
+            testType: .feature,
+            codeword: "code",
+            testerEmail: "tester@example.com",
+            outcome: nil,
+            feedback: "Feedback",
+            checkedItems: [])
+
+        let request = try client.makeResultRequest(result)
+
+        #expect(request.httpMethod == "POST")
+        #expect(request.url?.absoluteString == "https://portal.buildbarber.com/api/sdk/v1/tests/results")
+        #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+        #expect(request.value(forHTTPHeaderField: "X-Api-Key") == "k123")
+        #expect(request.httpBody?.range(of: Data(#""feedback":"Feedback""#.utf8)) != nil)
+    }
+
     @Test func feedbackOnlyResultOmitsOutcome() throws {
         let result = BuildBarberTestResult(
             testType: .release,

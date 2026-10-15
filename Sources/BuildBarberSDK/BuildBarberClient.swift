@@ -123,7 +123,17 @@ public struct BuildBarberClient: Sendable {
 
     /// Sends a request and returns the raw response body for 2xx responses.
     public func send(method: String, path: String, body: Data? = nil) async throws -> Data {
-        let request = try makeRequest(method: method, path: path, body: body)
+        try await send(request: makeRequest(method: method, path: path, body: body))
+    }
+
+    func makeResultRequest(_ result: BuildBarberTestResult) throws -> URLRequest {
+        try makeRequest(
+            method: "POST",
+            path: "/tests/results",
+            body: JSONEncoder().encode(result))
+    }
+
+    func send(request: URLRequest) async throws -> Data {
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             if let apiError = try? JSONDecoder().decode(APIErrorBody.self, from: data) {
@@ -147,6 +157,11 @@ public struct BuildBarberClient: Sendable {
     }
 
     public func submitTestResult(_ result: BuildBarberTestResult, videoURL: URL? = nil) async throws {
+        guard let videoURL else {
+            _ = try await send(request: makeResultRequest(result))
+            return
+        }
+
         let request = try makeRequest(method: "POST", path: "/tests/results")
         guard let endpoint = request.url else { throw BuildBarberError.invalidURL }
         try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)

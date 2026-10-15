@@ -93,7 +93,8 @@ The session menu shows **Pass** and **Fail** buttons. Validation is enforced bef
 Apps using the Apple sign-in button must enable the **Sign in with Apple**
 capability for their app target in Xcode. Swift Package Manager libraries cannot
 add this app entitlement. Apple may only provide the tester's email on the first
-authorization.
+authorization. If authorization fails with error 1000, verify that the capability
+is enabled for the host app's target and its App ID.
 
 On submit, the SDK will post results to:
 
