@@ -186,6 +186,23 @@ public struct BuildBarberClient: Sendable {
         return try JSONDecoder().decode(Response.self, from: data)
     }
 
+    struct TestDefinitionResponse: Decodable, Sendable {
+        let showPassFailButtons: Bool
+    }
+
+    func makeDefinitionRequest(testType: BuildBarberTestType, codeword: String) throws -> URLRequest {
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: "&=+#")
+        let encoded = codeword.addingPercentEncoding(withAllowedCharacters: allowed) ?? codeword
+        return try makeRequest(method: "GET", path: "/tests?testType=\(testType.rawValue)&codeword=\(encoded)")
+    }
+
+    /// Whether the backend allows Pass/Fail buttons for this test (`showPassFailButtons`).
+    public func fetchShowPassFailButtons(testType: BuildBarberTestType, codeword: String) async throws -> Bool {
+        let data = try await send(request: makeDefinitionRequest(testType: testType, codeword: codeword))
+        return try JSONDecoder().decode(TestDefinitionResponse.self, from: data).showPassFailButtons
+    }
+
     struct TestResultResponse: Decodable, Sendable {
         let testRecordId: Int
         let status: String
