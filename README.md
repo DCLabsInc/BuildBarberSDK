@@ -93,6 +93,14 @@ Call this while a session is active. Invalid indices and calls outside an active
 session are ignored. The tester can still manually untick an automatically
 checked item in the session menu.
 
+## Recording limits
+
+The portal accepts videos up to 100 MB. The SDK records at a fixed bitrate and
+automatically stops recording after about 5 minutes 20 seconds, showing an
+alert and then the session menu. If a finished recording is still over 100 MB,
+the video is not uploaded; the feedback is still submitted, the video is saved
+to Photos, and the tester is told to upload it manually from their library.
+
 ## Submission behavior
 
 The session menu shows **Pass** and **Fail** buttons. Validation is enforced before submission:
@@ -112,12 +120,15 @@ On submit, the SDK will post results to:
 
 - `POST https://portal.buildbarber.com/api/sdk/v1/tests/results`
 
-Payload includes test type, codeword, tester email, optional outcome,
-optional feedback, and checked checklist keys. The session recording, when
-available, is uploaded with the result.
+Payload (JSON) includes test type, codeword, tester email, optional outcome,
+optional feedback, and checked checklist keys. The response contains a
+`testRecordId`. The session recording, when available, is then uploaded as
+`multipart/form-data` in a field named `video` to:
 
-If submission fails, the SDK shows an alert with the full error text and a
-**Copy to clipboard** button. If the server answers a video upload with HTTP 415,
-the SDK retries by submitting the result as plain JSON without the video.
+- `POST https://portal.buildbarber.com/api/sdk/v1/tests/{testRecordId}/video`
+
+If submission or the video upload fails, the SDK shows an alert with the full
+error text and a **Copy to clipboard** button. Note that a failed video upload
+happens after the result was recorded.
 
 Never log or expose your API key in client-side diagnostics.

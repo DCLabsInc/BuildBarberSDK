@@ -28,7 +28,7 @@ public final class BuildBarberSessionManager: ObservableObject {
     private var backgroundObserver: NSObjectProtocol?
     private var foregroundObserver: NSObjectProtocol?
     private var isActive = false
-
+    private var limitTask: Task<Void, Never>?
     public init() {}
 
     // MARK: Configuration
@@ -113,6 +113,57 @@ public final class BuildBarberSessionManager: ObservableObject {
             self.overlay = overlay
         }
         observeLifecycle()
+        scheduleRecordingLimit()
+    }
+
+    private func scheduleRecordingLimit() {
+        limitTask?.cancel()
+        limitTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(RecordingLimits.maxDuration))
+            guard !Task.isCancelled else { return }
+            await self?.handleRecordingLimitReached()
+        }
+    }
+
+    private func handleRecordingLimitReached() async {
+        guard isActive, !awaitingFeedback else { return }
+        awaitingFeedback = true
+        pendingVideoURL = await recorder.stop()
+
+        let minutes = Int((RecordingLimits.maxDuration / 60).rounded(.down))
+        let alert = UIAlertController(
+            title: "Recording stopped",
+            message: "Recording stopped automatically after about \(minutes) minutes to keep the video under 100 MB. Please submit your feedback now.",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            Task { @MainActor in self?.presentMenu() }
+        })
+        if let presenter = overlay?.presenter {
+            Self.topMost(from: presenter).present(alert, animated: true)
+        }
+    }
+
+    private static func topMost(from controller: UIViewController) -> UIViewController {
+        var top = controller
+        while let presented = top.presentedViewController { top = presented }
+        return top
+    }
+
+    private func presentOversizeAlert(in scene: UIWindowScene?, savedToPhotos: Bool, bytes: Int64) {
+        guard let window = scene?.windows.first(where: { !($0 is PassthroughWindow) && $0.isKeyWindow })
+            ?? scene?.windows.first(where: { !($0 is PassthroughWindow) }),
+              let root = window.rootViewController
+        else { return }
+        let megabytes = Int((Double(bytes) / 1_000_000).rounded())
+        let location = savedToPhotos
+            ? "It has been saved to your Photos library. Please upload it manually from there."
+            : "It could not be saved to your Photos library."
+        let alert = UIAlertController(
+            title: "Video too large to upload",
+            message: "Your recording is \(megabytes) MB, which is over the 100 MB upload limit, so it was not uploaded. Your feedback was submitted. \(location)",
+            preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        Self.topMost(from: root).present(alert, animated: true)
     }
 
     // MARK: Menu
@@ -137,9 +188,12 @@ public final class BuildBarberSessionManager: ObservableObject {
         presenter.present(host, animated: true)
     }
 
-    private func dismissMenu() {
-        menuController?.dismiss(animated: true)
+    private func dismissMenu() async {
+        guard let menu = menuController else { return }
         menuController = nil
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            menu.dismiss(animated: true) { continuation.resume() }
+        }
     }
 
     // MARK: Lifecycle
@@ -188,28 +242,34 @@ public final class BuildBarberSessionManager: ObservableObject {
         if !awaitingFeedback && pendingVideoURL == nil {
             pendingVideoURL = await recorder.stop()
         }
-        try await configuration.client.submitTestResult(result, videoURL: pendingVideoURL)
-        if let videoURL = pendingVideoURL { await saveToCameraRoll(videoURL) }
-        dismissMenu()
+        let videoSize = pendingVideoURL.map(RecordingLimits.fileSize(at:)) ?? 0
+        let tooLarge = RecordingLimits.exceedsUploadLimit(fileSize: videoSize)
+        try await configuration.client.submitTestResult(result, videoURL: tooLarge ? nil : pendingVideoURL)
+        var savedToPhotos = false
+        if let videoURL = pendingVideoURL { savedToPhotos = await saveToCameraRoll(videoURL) }
+        let scene = overlay?.presenter?.view.window?.windowScene
+        await dismissMenu()
         await finishSession()
+        if tooLarge { presentOversizeAlert(in: scene, savedToPhotos: savedToPhotos, bytes: videoSize) }
     }
 
-    private func saveToCameraRoll(_ url: URL) async {
+    @discardableResult
+    private func saveToCameraRoll(_ url: URL) async -> Bool {
         await Self.saveVideoToPhotoLibrary(url)
     }
 
     // Nonisolated so Photos' callbacks, which run on its own queues, are not main-actor isolated.
-    private nonisolated static func saveVideoToPhotoLibrary(_ url: URL) async {
+    private nonisolated static func saveVideoToPhotoLibrary(_ url: URL) async -> Bool {
         let status = await withCheckedContinuation { (continuation: CheckedContinuation<PHAuthorizationStatus, Never>) in
             PHPhotoLibrary.requestAuthorization(for: .addOnly) { continuation.resume(returning: $0) }
         }
-        guard status == .authorized else { return }
+        guard status == .authorized else { return false }
 
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             PHPhotoLibrary.shared().performChanges({
                 _ = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
-            }, completionHandler: { _, _ in
-                continuation.resume()
+            }, completionHandler: { success, _ in
+                continuation.resume(returning: success)
             })
         }
     }
@@ -217,6 +277,8 @@ public final class BuildBarberSessionManager: ObservableObject {
     private func finishSession() async {
         guard isActive else { return }
         isActive = false
+        limitTask?.cancel()
+        limitTask = nil
         stopObserving()
         overlay?.hide()
         overlay = nil
