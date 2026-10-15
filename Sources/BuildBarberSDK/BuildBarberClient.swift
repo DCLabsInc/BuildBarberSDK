@@ -135,10 +135,10 @@ public struct BuildBarberClient: Sendable {
         return try JSONDecoder().decode(Response.self, from: data)
     }
 
-    public func submitTestResult(_ result: BuildBarberTestResult) async throws {
-        _ = try await send(
-            method: "POST",
-            path: "/tests/results",
-            body: try JSONEncoder().encode(result))
+    public func submitTestResult(_ result: BuildBarberTestResult, videoURL: URL? = nil) async throws {
+        let request = try makeRequest(method: "POST", path: "/tests/results")
+        guard let endpoint = request.url else { throw BuildBarberError.invalidURL }
+        try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
+            .upload(payload: result, videoURL: videoURL)
     }
 }

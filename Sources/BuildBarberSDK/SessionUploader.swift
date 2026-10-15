@@ -13,14 +13,16 @@ struct SessionUploader: Sendable {
     let endpoint: URL
     var session: URLSession = .shared
 
-    func upload(payload: SessionPayload, videoURL: URL?) async throws {
+    func makeUploadRequest<Payload: Encodable>(
+        payload: Payload,
+        videoURL: URL?
+    ) throws -> (request: URLRequest, body: Data) {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         var form = MultipartFormData()
         form.addField(name: "payload", value: try encoder.encode(payload),
                       filename: "payload.json", mimeType: "application/json")
         if let videoURL {
-            // Mapped read avoids loading the whole recording into memory eagerly.
             let data = try Data(contentsOf: videoURL, options: .mappedIfSafe)
             form.addField(name: "video", value: data, filename: videoURL.lastPathComponent, mimeType: "video/mp4")
         }
@@ -28,9 +30,14 @@ struct SessionUploader: Sendable {
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
         request.setValue(form.contentType, forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue(apiKey, forHTTPHeaderField: "X-Api-Key")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        return (request, form.finalized())
+    }
 
-        let (_, response) = try await session.upload(for: request, from: form.finalized())
+    func upload<Payload: Encodable>(payload: Payload, videoURL: URL?) async throws {
+        let (request, body) = try makeUploadRequest(payload: payload, videoURL: videoURL)
+        let (_, response) = try await session.upload(for: request, from: body)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw UploadError.badStatus(http.statusCode)
         }
