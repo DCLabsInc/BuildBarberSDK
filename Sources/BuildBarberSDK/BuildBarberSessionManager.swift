@@ -90,30 +90,34 @@ public final class BuildBarberSessionManager: ObservableObject {
     private func presentConfirmation(from viewController: UIViewController) {
         let alert = UIAlertController(
             title: "Test session recording",
-            message: "On next screen tap 'Share entire screen' then tap anywhere below to start testing.",
+            message: "Recording helps us fix more bugs. On next screen tap 'Share entire screen' then tap anywhere below to start testing.",
             preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Start", style: .default) { [weak self] _ in
-            Task { @MainActor in await self?.beginRecording(from: viewController) }
+        alert.addAction(UIAlertAction(title: "Don't record", style: .cancel) { [weak self] _ in
+            Task { @MainActor in await self?.beginRecording(from: viewController, record: false) }
+        })
+        alert.addAction(UIAlertAction(title: "Record session", style: .default) { [weak self] _ in
+            Task { @MainActor in await self?.beginRecording(from: viewController, record: true) }
         })
         viewController.present(alert, animated: true)
     }
 
-    private func beginRecording(from viewController: UIViewController) async {
-        var recording = true
-        do {
-            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
-            try await recorder.start()
-        } catch {
-            // The session continues without video so testers can still submit feedback.
-            recording = false
-            if case RecorderError.cancelled = error {} else {
-                let alert = UIAlertController(
-                    title: "Couldn't start recording",
-                    message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))\n\nYou can still submit your feedback without a video.",
-                    preferredStyle: .alert)
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                Self.topMost(from: viewController).present(alert, animated: true)
+    private func beginRecording(from viewController: UIViewController, record: Bool) async {
+        var recording = record
+        _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
+        if record {
+            do {
+                try await recorder.start()
+            } catch {
+                // The session continues without video so testers can still submit feedback.
+                recording = false
+                if case RecorderError.cancelled = error {} else {
+                    let alert = UIAlertController(
+                        title: "Couldn't start recording",
+                        message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))\n\nYou can still submit your feedback without a video.",
+                        preferredStyle: .alert)
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    Self.topMost(from: viewController).present(alert, animated: true)
+                }
             }
         }
         isActive = true
@@ -128,10 +132,8 @@ public final class BuildBarberSessionManager: ObservableObject {
             overlay.show(in: scene)
             self.overlay = overlay
         }
-        if recording {
-            observeLifecycle()
-            scheduleRecordingLimit()
-        }
+        observeLifecycle()
+        if recording { scheduleRecordingLimit() }
     }
 
     private func scheduleRecordingLimit() {
@@ -235,15 +237,17 @@ public final class BuildBarberSessionManager: ObservableObject {
     }
 
     private func handleInterruption() async {
-        guard isActive, !awaitingFeedback else { return }
-        awaitingFeedback = true
-        let taskID = UIApplication.shared.beginBackgroundTask(withName: "BuildBarber.finalize")
-        pendingVideoURL = await recorder.stop()
-        if taskID != .invalid { UIApplication.shared.endBackgroundTask(taskID) }
+        guard isActive else { return }
+        if !awaitingFeedback {
+            awaitingFeedback = true
+            let taskID = UIApplication.shared.beginBackgroundTask(withName: "BuildBarber.finalize")
+            pendingVideoURL = await recorder.stop()
+            if taskID != .invalid { UIApplication.shared.endBackgroundTask(taskID) }
+        }
 
         let content = UNMutableNotificationContent()
-        content.title = "Session paused"
-        content.body = "Your session was paused. Tap here to provide feedback and submit your result."
+        content.title = "Feedback needed"
+        content.body = "Tap here to return to the app and submit your test feedback."
         content.sound = .default
         let request = UNNotificationRequest(identifier: "com.buildbarber.sdk.paused", content: content, trigger: nil)
         try? await UNUserNotificationCenter.current().add(request)
