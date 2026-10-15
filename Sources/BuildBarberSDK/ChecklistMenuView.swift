@@ -1,12 +1,16 @@
 #if canImport(UIKit)
+import AuthenticationServices
 import SwiftUI
 
 struct ChecklistMenuView: View {
+    private static let appleEmailDefaultsKey = "com.buildbarber.sdk.testerEmail"
+
     let test: BuildBarberTest
     @ObservedObject var sessionManager: BuildBarberSessionManager
     let onSubmit: (String?, String, String, [String]) async throws -> Void
 
-    @State private var testerEmail = ""
+    @State private var testerEmail = UserDefaults.standard.string(forKey: Self.appleEmailDefaultsKey) ?? ""
+    @State private var signInError: String?
     @State private var feedback = ""
     @State private var isSubmitting = false
     @State private var submissionError: String?
@@ -29,6 +33,33 @@ struct ChecklistMenuView: View {
                         Label(item.label, systemImage: sessionManager.checkedChecklistItemKeys.contains(item.key) ? "checkmark.square.fill" : "square")
                             .foregroundStyle(.primary)
                     }
+                }
+                Text("Sign in with Apple to fill in your email address.")
+                    .font(.caption)
+
+                SignInWithAppleButton(.signIn) { request in
+                    request.requestedScopes = [.email]
+                } onCompletion: { result in
+                    switch result {
+                    case .success(let authorization):
+                        if let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                           let email = credential.email {
+                            testerEmail = email
+                            UserDefaults.standard.set(email, forKey: Self.appleEmailDefaultsKey)
+                            signInError = nil
+                        }
+                    case .failure:
+                        signInError = "Sign in with Apple was unsuccessful. Please try again."
+                    }
+                }
+                .signInWithAppleButtonStyle(.black)
+                .frame(height: 44)
+                .padding(.horizontal)
+
+                if let signInError {
+                    Text(signInError)
+                        .foregroundStyle(.red)
+                        .font(.caption)
                 }
 
                 TextField("Tester email", text: $testerEmail)

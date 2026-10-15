@@ -15,6 +15,35 @@ import Foundation
     }
 }
 
+@Suite struct SessionUploaderTests {
+    @Test func uploadRequestIncludesResultVideoAndAPIKey() throws {
+        let videoURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("buildbarber-test-\(UUID().uuidString).mp4")
+        try Data("video-data".utf8).write(to: videoURL)
+        defer { try? FileManager.default.removeItem(at: videoURL) }
+
+        let uploader = SessionUploader(
+            apiKey: "test-key",
+            endpoint: URL(string: "https://portal.buildbarber.com/api/sdk/v1/tests/results")!)
+        let result = BuildBarberTestResult(
+            testType: .feature,
+            codeword: "code",
+            testerEmail: "tester@example.com",
+            outcome: "pass",
+            feedback: "Looks good",
+            checkedItems: ["check-1"])
+        let (request, body) = try uploader.makeUploadRequest(payload: result, videoURL: videoURL)
+
+        #expect(request.httpMethod == "POST")
+        #expect(request.value(forHTTPHeaderField: "X-Api-Key") == "test-key")
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        #expect(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
+        #expect(body.range(of: Data(#""testerEmail":"tester@example.com""#.utf8)) != nil)
+        #expect(body.range(of: Data("filename=\"\(videoURL.lastPathComponent)\"".utf8)) != nil)
+        #expect(body.range(of: Data("video-data".utf8)) != nil)
+    }
+}
+
 @Suite struct ClientTests {
     @Test func requestUsesPortalHostPathAndApiKey() throws {
         let client = BuildBarberClient(configuration: .init(apiKey: "k123"))

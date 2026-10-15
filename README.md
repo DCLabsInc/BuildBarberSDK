@@ -88,12 +88,14 @@ The session menu shows **Pass** and **Fail** buttons. Validation is enforced bef
 - Pass requires all checklist items to be ticked.
 - Fail requires feedback text.
 - Feedback-only submissions omit `outcome`.
+- Testers can sign in with Apple to fill in their email address.
 
 On submit, the SDK posts results to:
 
 - `POST https://portal.buildbarber.com/api/sdk/v1/tests/results`
 
 Payload includes test type, codeword, tester email, optional outcome,
-optional feedback, and checked checklist keys.
+optional feedback, and checked checklist keys. The session recording, when
+available, is uploaded with the result.
 
 Never log or expose your API key in client-side diagnostics.

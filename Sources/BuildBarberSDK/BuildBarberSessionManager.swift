@@ -184,7 +184,10 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     private func submit(_ result: BuildBarberTestResult) async throws {
         guard isActive, let configuration else { return }
-        try await configuration.client.submitTestResult(result)
+        if !awaitingFeedback && pendingVideoURL == nil {
+            pendingVideoURL = await recorder.stop()
+        }
+        try await configuration.client.submitTestResult(result, videoURL: pendingVideoURL)
         dismissMenu()
         await finishSession()
     }
@@ -195,7 +198,10 @@ public final class BuildBarberSessionManager: ObservableObject {
         stopObserving()
         overlay?.hide()
         overlay = nil
-        let videoURL: URL? = if awaitingFeedback { pendingVideoURL } else { await recorder.stop() }
+        var videoURL = pendingVideoURL
+        if videoURL == nil && !awaitingFeedback {
+            videoURL = await recorder.stop()
+        }
         pendingVideoURL = nil
         awaitingFeedback = false
         checkedItems.removeAll()
