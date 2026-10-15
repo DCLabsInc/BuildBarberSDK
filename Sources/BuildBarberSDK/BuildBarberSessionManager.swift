@@ -82,10 +82,9 @@ public final class BuildBarberSessionManager: ObservableObject {
     }
 
     private func presentConfirmation(from viewController: UIViewController) {
-        let items = (currentTest?.checklist ?? []).map { "• \($0.label)" }.joined(separator: "\n")
         let alert = UIAlertController(
-            title: "Test session",
-            message: "Please test the following items:\n\n\(items)\n\nThen tap the icon at the top of the screen to complete your test. Screen recording will begin when you start the test and be sent with the test feedback. Thanks again for helping us test and improve the app!",
+            title: "Test session recording",
+            message: "On next screen tap 'Share entire screen' then tap anywhere below to start testing.",
             preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Start", style: .default) { [weak self] _ in
@@ -95,18 +94,21 @@ public final class BuildBarberSessionManager: ObservableObject {
     }
 
     private func beginRecording(from viewController: UIViewController) async {
+        var recording = true
         do {
             _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
             try await recorder.start()
         } catch {
-            if case RecorderError.cancelled = error { return }
-            let alert = UIAlertController(
-                title: "Couldn't start recording",
-                message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))",
-                preferredStyle: .alert)
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
-            Self.topMost(from: viewController).present(alert, animated: true)
-            return
+            // The session continues without video so testers can still submit feedback.
+            recording = false
+            if case RecorderError.cancelled = error {} else {
+                let alert = UIAlertController(
+                    title: "Couldn't start recording",
+                    message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))\n\nYou can still submit your feedback without a video.",
+                    preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                Self.topMost(from: viewController).present(alert, animated: true)
+            }
         }
         isActive = true
         awaitingFeedback = false
@@ -120,8 +122,10 @@ public final class BuildBarberSessionManager: ObservableObject {
             overlay.show(in: scene)
             self.overlay = overlay
         }
-        observeLifecycle()
-        scheduleRecordingLimit()
+        if recording {
+            observeLifecycle()
+            scheduleRecordingLimit()
+        }
     }
 
     private func scheduleRecordingLimit() {
