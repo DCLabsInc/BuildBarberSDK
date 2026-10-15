@@ -47,14 +47,15 @@ final class SampleWriter: @unchecked Sendable {
         let v = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: Int(dims.width),
-            AVVideoHeightKey: Int(dims.height)
+            AVVideoHeightKey: Int(dims.height),
+            AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: RecordingLimits.videoBitRate]
         ])
         v.expectsMediaDataInRealTime = true
         let a = AVAssetWriterInput(mediaType: .audio, outputSettings: [
             AVFormatIDKey: kAudioFormatMPEG4AAC,
             AVSampleRateKey: 44_100,
             AVNumberOfChannelsKey: 2,
-            AVEncoderBitRateKey: 128_000
+            AVEncoderBitRateKey: RecordingLimits.audioBitRate
         ])
         a.expectsMediaDataInRealTime = true
         if w.canAdd(v) { w.add(v) }

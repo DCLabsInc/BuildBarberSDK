@@ -16,7 +16,7 @@ import Foundation
 }
 
 @Suite struct SessionUploaderTests {
-    @Test func uploadRequestIncludesResultVideoAndAPIKey() throws {
+    @Test func uploadRequestIncludesVideoFieldAndAPIKey() throws {
         let videoURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("buildbarber-test-\(UUID().uuidString).mp4")
         try Data("video-data".utf8).write(to: videoURL)
@@ -24,24 +24,15 @@ import Foundation
 
         let uploader = SessionUploader(
             apiKey: "test-key",
-            endpoint: URL(string: "https://portal.buildbarber.com/api/sdk/v1/tests/results")!)
-        let result = BuildBarberTestResult(
-            testType: .feature,
-            codeword: "code",
-            testerEmail: "tester@example.com",
-            outcome: "pass",
-            feedback: "Looks good",
-            checkedItems: ["check-1"])
-        let (request, body) = try uploader.makeUploadRequest(payload: result, videoURL: videoURL)
+            endpoint: URL(string: "https://portal.buildbarber.com/api/sdk/v1/tests/7/video")!)
+        let (request, body) = try uploader.makeUploadRequest(videoURL: videoURL)
 
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "X-Api-Key") == "test-key")
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
-        #expect(body.range(of: Data(#""testerEmail":"tester@example.com""#.utf8)) != nil)
-        #expect(body.range(of: Data("name=\"payload\"".utf8)) != nil)
-        #expect(body.range(of: Data("filename=\"payload.json\"".utf8)) == nil)
-        #expect(body.range(of: Data("filename=\"\(videoURL.lastPathComponent)\"".utf8)) != nil)
+        #expect(body.range(of: Data("name=\"video\"; filename=\"\(videoURL.lastPathComponent)\"".utf8)) != nil)
+        #expect(body.range(of: Data("name=\"payload\"".utf8)) == nil)
         #expect(body.range(of: Data("video-data".utf8)) != nil)
     }
 
@@ -80,6 +71,16 @@ import Foundation
         #expect(request.httpBody?.range(of: Data(#""feedback":"Feedback""#.utf8)) != nil)
     }
 
+    @Test func videoEndpointUsesTestRecordId() throws {
+        let client = BuildBarberClient(configuration: .init(apiKey: "k123"))
+        #expect(try client.makeVideoRequestURL(testRecordId: 42).absoluteString
+            == "https://portal.buildbarber.com/api/sdk/v1/tests/42/video")
+        let response = try JSONDecoder().decode(
+            BuildBarberClient.TestResultResponse.self,
+            from: Data(#"{"testRecordId":42,"status":"passed"}"#.utf8))
+        #expect(response.testRecordId == 42)
+    }
+
     @Test func feedbackOnlyResultOmitsOutcome() throws {
         let result = BuildBarberTestResult(
             testType: .release,
@@ -105,5 +106,19 @@ import Foundation
             body: APIErrorBody(error: "invalid_result", message: "Missing codeword.")
         ).localizedDescription == "Missing codeword.")
         #expect(BuildBarberError.badStatus(500).localizedDescription == "The request failed (HTTP 500).")
+    }
+}
+
+@Suite struct RecordingLimitsTests {
+    @Test func maxDurationKeepsExpectedSizeUnderUploadLimit() {
+        let bitsPerSecond = Double(RecordingLimits.videoBitRate + RecordingLimits.audioBitRate)
+        let expectedBytes = RecordingLimits.maxDuration * bitsPerSecond / 8
+        #expect(expectedBytes < Double(RecordingLimits.maxUploadBytes))
+        #expect(RecordingLimits.maxDuration > 60)
+    }
+
+    @Test func uploadLimitIsExclusiveOfExactLimit() {
+        #expect(!RecordingLimits.exceedsUploadLimit(fileSize: RecordingLimits.maxUploadBytes))
+        #expect(RecordingLimits.exceedsUploadLimit(fileSize: RecordingLimits.maxUploadBytes + 1))
     }
 }

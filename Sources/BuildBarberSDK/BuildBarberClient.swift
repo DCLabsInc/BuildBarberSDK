@@ -186,20 +186,26 @@ public struct BuildBarberClient: Sendable {
         return try JSONDecoder().decode(Response.self, from: data)
     }
 
-    public func submitTestResult(_ result: BuildBarberTestResult, videoURL: URL? = nil) async throws {
-        guard let videoURL else {
-            _ = try await send(request: makeResultRequest(result))
-            return
-        }
+    struct TestResultResponse: Decodable, Sendable {
+        let testRecordId: Int
+        let status: String
+    }
 
-        let request = try makeRequest(method: "POST", path: "/tests/results")
-        guard let endpoint = request.url else { throw BuildBarberError.invalidURL }
-        do {
-            try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
-                .upload(payload: result, videoURL: videoURL)
-        } catch let error as BuildBarberError where error.statusCode == 415 {
-            // The server rejected multipart; submit the result as plain JSON so feedback is not lost.
-            _ = try await send(request: makeResultRequest(result))
+    func makeVideoRequestURL(testRecordId: Int) throws -> URL {
+        guard let url = try makeRequest(method: "POST", path: "/tests/\(testRecordId)/video").url else {
+            throw BuildBarberError.invalidURL
         }
+        return url
+    }
+
+    /// Submits the result as JSON, then attaches the recording to the created test record.
+    public func submitTestResult(_ result: BuildBarberTestResult, videoURL: URL? = nil) async throws {
+        let data = try await send(request: makeResultRequest(result))
+        guard let videoURL else { return }
+
+        let response = try JSONDecoder().decode(TestResultResponse.self, from: data)
+        let endpoint = try makeVideoRequestURL(testRecordId: response.testRecordId)
+        try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
+            .upload(videoURL: videoURL)
     }
 }

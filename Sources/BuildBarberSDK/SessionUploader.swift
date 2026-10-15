@@ -3,25 +3,16 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// Uploads the session payload and video as multipart/form-data.
+/// Uploads the session recording as multipart/form-data in a field named `video`.
 struct SessionUploader: Sendable {
     let apiKey: String
     let endpoint: URL
     var session: URLSession = .shared
 
-    func makeUploadRequest<Payload: Encodable>(
-        payload: Payload,
-        videoURL: URL?
-    ) throws -> (request: URLRequest, body: Data) {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+    func makeUploadRequest(videoURL: URL) throws -> (request: URLRequest, body: Data) {
         var form = MultipartFormData()
-        form.addField(name: "payload", value: try encoder.encode(payload),
-                      mimeType: "application/json")
-        if let videoURL {
-            let data = try Data(contentsOf: videoURL, options: .mappedIfSafe)
-            form.addField(name: "video", value: data, filename: videoURL.lastPathComponent, mimeType: "video/mp4")
-        }
+        let data = try Data(contentsOf: videoURL, options: .mappedIfSafe)
+        form.addField(name: "video", value: data, filename: videoURL.lastPathComponent, mimeType: "video/mp4")
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -31,8 +22,8 @@ struct SessionUploader: Sendable {
         return (request, form.finalized())
     }
 
-    func upload<Payload: Encodable>(payload: Payload, videoURL: URL?) async throws {
-        let (request, body) = try makeUploadRequest(payload: payload, videoURL: videoURL)
+    func upload(videoURL: URL) async throws {
+        let (request, body) = try makeUploadRequest(videoURL: videoURL)
         let (data, response) = try await session.upload(for: request, from: body)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw Self.error(statusCode: http.statusCode, responseBody: data)
