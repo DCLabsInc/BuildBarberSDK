@@ -74,6 +74,7 @@ public enum BuildBarberError: Error, LocalizedError, Sendable, Equatable {
     case invalidURL
     case api(status: Int, body: APIErrorBody)
     case badStatus(Int)
+    case http(status: Int, text: String)
 
     public var errorDescription: String? {
         switch self {
@@ -81,9 +82,41 @@ public enum BuildBarberError: Error, LocalizedError, Sendable, Equatable {
             "The request URL is invalid."
         case let .api(status, body):
             body.message ?? "The request failed (HTTP \(status))."
-        case let .badStatus(status):
+        case let .badStatus(status), let .http(status, _):
             "The request failed (HTTP \(status))."
         }
+    }
+
+    var statusCode: Int? {
+        switch self {
+        case .invalidURL: nil
+        case let .api(status, _), let .badStatus(status), let .http(status, _): status
+        }
+    }
+
+    /// Full error text (status, code and raw response) suitable for copying into a bug report.
+    public var detailedDescription: String {
+        switch self {
+        case .invalidURL:
+            return "The request URL is invalid."
+        case let .api(status, body):
+            return "HTTP \(status)\nerror: \(body.error)\nmessage: \(body.message ?? "none")"
+        case let .badStatus(status):
+            return "HTTP \(status)"
+        case let .http(status, text):
+            return "HTTP \(status)\n\(text)"
+        }
+    }
+}
+
+extension BuildBarberError {
+    static func make(statusCode: Int, responseBody: Data) -> BuildBarberError {
+        if let apiError = try? JSONDecoder().decode(APIErrorBody.self, from: responseBody) {
+            return .api(status: statusCode, body: apiError)
+        }
+        let text = String(decoding: responseBody.prefix(4096), as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? .badStatus(statusCode) : .http(status: statusCode, text: text)
     }
 }
 
@@ -136,10 +169,7 @@ public struct BuildBarberClient: Sendable {
     func send(request: URLRequest) async throws -> Data {
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            if let apiError = try? JSONDecoder().decode(APIErrorBody.self, from: data) {
-                throw BuildBarberError.api(status: http.statusCode, body: apiError)
-            }
-            throw BuildBarberError.badStatus(http.statusCode)
+            throw BuildBarberError.make(statusCode: http.statusCode, responseBody: data)
         }
         return data
     }
@@ -164,7 +194,12 @@ public struct BuildBarberClient: Sendable {
 
         let request = try makeRequest(method: "POST", path: "/tests/results")
         guard let endpoint = request.url else { throw BuildBarberError.invalidURL }
-        try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
-            .upload(payload: result, videoURL: videoURL)
+        do {
+            try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
+                .upload(payload: result, videoURL: videoURL)
+        } catch let error as BuildBarberError where error.statusCode == 415 {
+            // The server rejected multipart; submit the result as plain JSON so feedback is not lost.
+            _ = try await send(request: makeResultRequest(result))
+        }
     }
 }

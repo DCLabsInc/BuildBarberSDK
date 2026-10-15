@@ -14,6 +14,8 @@ struct ChecklistMenuView: View {
     @State private var feedback = ""
     @State private var isSubmitting = false
     @State private var submissionError: String?
+    @State private var errorDetails: String?
+    @State private var showingErrorDetails = false
 
     private var allItemsChecked: Bool {
         test.checklist.allSatisfy { sessionManager.checkedChecklistItemKeys.contains($0.key) }
@@ -111,6 +113,14 @@ struct ChecklistMenuView: View {
             }
             .navigationTitle(test.title)
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Error submitting feedback", isPresented: $showingErrorDetails) {
+                Button("Copy to clipboard") {
+                    UIPasteboard.general.string = errorDetails
+                }
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(errorDetails ?? "")
+            }
         }
     }
 
@@ -126,6 +136,8 @@ struct ChecklistMenuView: View {
                     test.checklist.filter { sessionManager.checkedChecklistItemKeys.contains($0.key) }.map(\.key))
             } catch {
                 submissionError = error.localizedDescription
+                errorDetails = (error as? BuildBarberError)?.detailedDescription ?? String(describing: error)
+                showingErrorDetails = true
                 isSubmitting = false
             }
         }
