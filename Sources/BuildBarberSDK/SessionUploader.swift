@@ -21,7 +21,7 @@ struct SessionUploader: Sendable {
         encoder.dateEncodingStrategy = .iso8601
         var form = MultipartFormData()
         form.addField(name: "payload", value: try encoder.encode(payload),
-                      filename: "payload.json", mimeType: "application/json")
+                      mimeType: "application/json")
         if let videoURL {
             let data = try Data(contentsOf: videoURL, options: .mappedIfSafe)
             form.addField(name: "video", value: data, filename: videoURL.lastPathComponent, mimeType: "video/mp4")

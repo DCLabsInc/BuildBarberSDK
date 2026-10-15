@@ -39,6 +39,8 @@ import Foundation
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
         #expect(body.range(of: Data(#""testerEmail":"tester@example.com""#.utf8)) != nil)
+        #expect(body.range(of: Data("name=\"payload\"".utf8)) != nil)
+        #expect(body.range(of: Data("filename=\"payload.json\"".utf8)) == nil)
         #expect(body.range(of: Data("filename=\"\(videoURL.lastPathComponent)\"".utf8)) != nil)
         #expect(body.range(of: Data("video-data".utf8)) != nil)
     }
