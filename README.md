@@ -90,6 +90,11 @@ The session menu shows **Pass** and **Fail** buttons. Validation is enforced bef
 - Feedback-only submissions omit `outcome`.
 - Testers can sign in with Apple to fill in their email address.
 
+Apps using the Apple sign-in button must enable the **Sign in with Apple**
+capability for their app target in Xcode. Swift Package Manager libraries cannot
+add this app entitlement. Apple may only provide the tester's email on the first
+authorization.
+
 On submit, the SDK posts results to:
 
 - `POST https://portal.buildbarber.com/api/sdk/v1/tests/results`
