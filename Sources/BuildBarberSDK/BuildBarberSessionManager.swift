@@ -71,14 +71,20 @@ public final class BuildBarberSessionManager: ObservableObject {
     public func startSession(presentingFrom viewController: UIViewController) {
         guard let configuration, !isActive else { return }
         checkedItems.removeAll()
-        currentTest = BuildBarberTest(
-            title: "Test session",
-            instructions: "Tick each item as you complete it, then submit your result.",
-            checklist: configuration.checklistItems.map {
-                BuildBarberTest.ChecklistItem(key: $0, label: $0, kind: "task")
-            },
-            showPassFailButtons: true)
-        presentConfirmation(from: viewController)
+        Task { @MainActor in
+            // If the definition can't be fetched, fall back to the feedback-only flow.
+            let showPassFail = (try? await configuration.client.fetchShowPassFailButtons(
+                testType: configuration.testType, codeword: configuration.codeword)) ?? false
+            guard !self.isActive else { return }
+            self.currentTest = BuildBarberTest(
+                title: "Test session",
+                instructions: "Tick each item as you complete it, then submit your result.",
+                checklist: configuration.checklistItems.map {
+                    BuildBarberTest.ChecklistItem(key: $0, label: $0, kind: "task")
+                },
+                showPassFailButtons: showPassFail)
+            self.presentConfirmation(from: viewController)
+        }
     }
 
     private func presentConfirmation(from viewController: UIViewController) {

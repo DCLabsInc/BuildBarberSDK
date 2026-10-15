@@ -122,3 +122,19 @@ import Foundation
         #expect(RecordingLimits.exceedsUploadLimit(fileSize: RecordingLimits.maxUploadBytes + 1))
     }
 }
+
+@Suite struct TestDefinitionTests {
+    @Test func definitionRequestTargetsTestsEndpoint() throws {
+        let client = BuildBarberClient(configuration: BuildBarberConfiguration(apiKey: "k"))
+        let request = try client.makeDefinitionRequest(testType: .release, codeword: "a b&c")
+        let url = try #require(request.url?.absoluteString)
+        #expect(url.hasSuffix("/api/sdk/v1/tests?testType=Release&codeword=a%20b%26c"))
+        #expect(request.httpMethod == "GET")
+    }
+
+    @Test func decodesShowPassFailFlag() throws {
+        let json = #"{"testType":"Feature","codeword":"x","showPassFailButtons":false,"checklist":[]}"#
+        let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
+        #expect(decoded.showPassFailButtons == false)
+    }
+}
