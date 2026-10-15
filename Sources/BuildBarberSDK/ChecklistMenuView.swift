@@ -79,6 +79,15 @@ struct ChecklistMenuView: View {
 
                 TextEditor(text: $feedback)
                     .frame(minHeight: 100, maxHeight: 160)
+                    .overlay(alignment: .topLeading) {
+                        if feedback.isEmpty {
+                            Text("Feedback for developer")
+                                .foregroundStyle(.secondary)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 8)
+                                .allowsHitTesting(false)
+                        }
+                    }
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.4)))
                     .padding(.horizontal)
 
