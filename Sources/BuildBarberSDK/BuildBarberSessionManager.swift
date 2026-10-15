@@ -69,7 +69,7 @@ public final class BuildBarberSessionManager: ObservableObject {
     // MARK: Session start
 
     public func startSession(presentingFrom viewController: UIViewController) {
-        guard let configuration, !isActive else { return }
+        guard let configuration, !isActive, !hasCompletedTest(configuration) else { return }
         checkedItems.removeAll()
         Task { @MainActor in
             // If the definition can't be fetched, fall back to the feedback-only flow.
@@ -85,6 +85,25 @@ public final class BuildBarberSessionManager: ObservableObject {
                 showPassFailButtons: showPassFail)
             self.presentConfirmation(from: viewController)
         }
+    }
+
+    // MARK: Completion tracking
+
+    /// Completion is remembered per test and per installed build (version + build number).
+    private func completionKey(_ configuration: Configuration) -> String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? ""
+        let build = info?["CFBundleVersion"] as? String ?? ""
+        return "com.buildbarber.sdk.completed.\(configuration.testType.rawValue).\(configuration.codeword)"
+            + ".\(version).\(build)"
+    }
+
+    private func hasCompletedTest(_ configuration: Configuration) -> Bool {
+        UserDefaults.standard.bool(forKey: completionKey(configuration))
+    }
+
+    private func markTestCompleted(_ configuration: Configuration) {
+        UserDefaults.standard.set(true, forKey: completionKey(configuration))
     }
 
     private func presentConfirmation(from viewController: UIViewController) {
@@ -269,6 +288,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         let videoSize = pendingVideoURL.map(RecordingLimits.fileSize(at:)) ?? 0
         let tooLarge = RecordingLimits.exceedsUploadLimit(fileSize: videoSize)
         try await configuration.client.submitTestResult(result, videoURL: tooLarge ? nil : pendingVideoURL)
+        markTestCompleted(configuration)
         var savedToPhotos = false
         if let videoURL = pendingVideoURL { savedToPhotos = await saveToCameraRoll(videoURL) }
         let scene = overlay?.presenter?.view.window?.windowScene
