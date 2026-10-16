@@ -10,6 +10,11 @@ import UserNotifications
 public final class BuildBarberSessionManager: ObservableObject {
     public static let shared = BuildBarberSessionManager()
 
+    /// Shows a yellow dot under each touch in the recorded video.
+    public var showsTouchIndicator = true
+    /// How long a quick tap is held back so the dot reaches the video before the app reacts, in seconds. 0 disables.
+    public var tapDelay: TimeInterval = 0.2
+
     private struct Configuration {
         let client: BuildBarberClient
         let testType: BuildBarberTestType
@@ -251,6 +256,9 @@ public final class BuildBarberSessionManager: ObservableObject {
             let overlay = FloatingOverlay { [weak self] in self?.presentMenu() }
             overlay.show(in: scene)
             self.overlay = overlay
+            if recording, showsTouchIndicator, let host = overlay.presenter?.view {
+                TouchIndicator.shared.start(in: host, ignoring: overlay.overlayWindow, minimumVisibleTime: tapDelay)
+            }
         }
         observeLifecycle()
         if recording { scheduleRecordingLimit() }
@@ -268,6 +276,7 @@ public final class BuildBarberSessionManager: ObservableObject {
     private func handleRecordingLimitReached() async {
         guard isActive, !awaitingFeedback else { return }
         awaitingFeedback = true
+        TouchIndicator.shared.stop()
         pendingVideoURL = await recorder.stop()
 
         let minutes = Int((RecordingLimits.maxDuration / 60).rounded(.down))
@@ -360,6 +369,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         guard isActive else { return }
         if !awaitingFeedback {
             awaitingFeedback = true
+            TouchIndicator.shared.stop()
             let taskID = UIApplication.shared.beginBackgroundTask(withName: "BuildBarber.finalize")
             pendingVideoURL = await recorder.stop()
             if taskID != .invalid { UIApplication.shared.endBackgroundTask(taskID) }
@@ -427,6 +437,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         limitTask?.cancel()
         limitTask = nil
         stopObserving()
+        TouchIndicator.shared.stop()
         overlay?.hide()
         overlay = nil
         var videoURL = pendingVideoURL
