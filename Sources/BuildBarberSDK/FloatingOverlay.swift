@@ -48,6 +48,9 @@ final class FloatingOverlay {
     /// The overlay's root controller, used to present the menu above the app.
     var presenter: UIViewController? { window?.rootViewController }
 
+    /// Overlay window and root view for drawing tap indicators.
+    var overlayWindow: UIWindow? { window }
+
     func hide() {
         window?.isHidden = true
         window = nil
