@@ -10,9 +10,13 @@ struct SessionUploader: Sendable {
     var session: URLSession = .shared
 
     func makeUploadRequest(videoURL: URL) throws -> (request: URLRequest, body: Data) {
+        try makeUploadRequest(fileURL: videoURL, field: "video", mimeType: "video/mp4")
+    }
+
+    func makeUploadRequest(fileURL: URL, field: String, mimeType: String) throws -> (request: URLRequest, body: Data) {
         var form = MultipartFormData()
-        let data = try Data(contentsOf: videoURL, options: .mappedIfSafe)
-        form.addField(name: "video", value: data, filename: videoURL.lastPathComponent, mimeType: "video/mp4")
+        let data = try Data(contentsOf: fileURL, options: .mappedIfSafe)
+        form.addField(name: field, value: data, filename: fileURL.lastPathComponent, mimeType: mimeType)
 
         var request = URLRequest(url: endpoint)
         request.httpMethod = "POST"
@@ -23,7 +27,11 @@ struct SessionUploader: Sendable {
     }
 
     func upload(videoURL: URL) async throws {
-        let (request, body) = try makeUploadRequest(videoURL: videoURL)
+        try await upload(fileURL: videoURL, field: "video", mimeType: "video/mp4")
+    }
+
+    func upload(fileURL: URL, field: String, mimeType: String) async throws {
+        let (request, body) = try makeUploadRequest(fileURL: fileURL, field: field, mimeType: mimeType)
         let (data, response) = try await session.upload(for: request, from: body)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw Self.error(statusCode: http.statusCode, responseBody: data)

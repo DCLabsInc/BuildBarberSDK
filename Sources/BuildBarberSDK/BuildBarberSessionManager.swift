@@ -31,6 +31,8 @@ public final class BuildBarberSessionManager: ObservableObject {
     private var limitTask: Task<Void, Never>?
     private let shakeDetector = ShakeDetector()
     private var isShowingRepeatPrompt = false
+    private var crashRecovery: CrashRecovery?
+    private var launchObserver: NSObjectProtocol?
     public init() {}
 
     // MARK: Configuration
@@ -47,6 +49,71 @@ public final class BuildBarberSessionManager: ObservableObject {
             codeword: codeword,
             checklistItems: checklistItems)
         shakeDetector.start { [weak self] in self?.handleShake() }
+        recoverFromCrashIfNeeded()
+    }
+
+    // MARK: Crash recovery
+
+    private func recoverFromCrashIfNeeded() {
+        guard crashRecovery == nil, !isActive, let recovery = CrashReporter.recoverCrashedSession() else { return }
+        if let video = recovery.videoURL, !recovery.savedToPhotos {
+            Task { @MainActor in
+                if await self.saveToCameraRoll(video) {
+                    CrashReporter.markSavedToPhotos()
+                    self.crashRecovery?.savedToPhotos = true
+                }
+            }
+        }
+        crashRecovery = recovery
+        presentCrashFeedbackWhenReady()
+    }
+
+    private func presentCrashFeedbackWhenReady() {
+        if let scene = Self.activeScene() {
+            // Let the host app finish its own launch UI first.
+            Task { @MainActor in
+                try? await Task.sleep(for: .seconds(1))
+                await self.beginCrashFeedback(in: Self.activeScene() ?? scene)
+            }
+            return
+        }
+        launchObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let observer = self.launchObserver else { return }
+                NotificationCenter.default.removeObserver(observer)
+                self.launchObserver = nil
+                self.presentCrashFeedbackWhenReady()
+            }
+        }
+    }
+
+    private static func activeScene() -> UIWindowScene? {
+        UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .first(where: { $0.activationState == .foregroundActive })
+    }
+
+    private func beginCrashFeedback(in scene: UIWindowScene) async {
+        guard let configuration, let recovery = crashRecovery, !isActive else { return }
+        let showPassFail = (try? await configuration.client.fetchShowPassFailButtons(
+            testType: configuration.testType, codeword: configuration.codeword)) ?? false
+        guard !isActive else { return }
+        checkedItems.removeAll()
+        currentTest = BuildBarberTest(
+            title: "Test session",
+            instructions: "The app crashed. Your recording and crash log will be sent when you submit.",
+            checklist: configuration.checklistItems.map {
+                BuildBarberTest.ChecklistItem(key: $0, label: $0, kind: "task")
+            },
+            showPassFailButtons: showPassFail)
+        isActive = true
+        awaitingFeedback = true
+        pendingVideoURL = recovery.videoURL
+        let overlay = FloatingOverlay { [weak self] in self?.presentMenu() }
+        overlay.show(in: scene)
+        self.overlay = overlay
+        presentMenu(initialFeedback: "Crashed - logs attached")
     }
 
     private func handleShake() {
@@ -175,6 +242,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         isActive = true
         awaitingFeedback = false
         pendingVideoURL = nil
+        CrashReporter.beginSession(videoFileName: recording ? recorder.currentVideoFileName : nil)
         recorder.onStreamError = { [weak self] _ in
             Task { @MainActor in await self?.handleInterruption() }
         }
@@ -240,12 +308,12 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     // MARK: Menu
 
-    private func presentMenu() {
+    private func presentMenu(initialFeedback: String = "") {
         // A swipe-dismissed sheet leaves a stale reference behind.
         if let menu = menuController, menu.presentingViewController == nil { menuController = nil }
         guard menuController == nil, let presenter = overlay?.presenter else { return }
         guard let test = currentTest else { return }
-        let view = ChecklistMenuView(test: test, sessionManager: self) { [weak self] outcome, email, feedback, checkedItems in
+        let view = ChecklistMenuView(test: test, sessionManager: self, initialFeedback: initialFeedback) { [weak self] outcome, email, feedback, checkedItems in
             guard let self, let configuration = self.configuration else { return }
             let result = BuildBarberTestResult(
                 testType: configuration.testType,
@@ -320,10 +388,12 @@ public final class BuildBarberSessionManager: ObservableObject {
         }
         let videoSize = pendingVideoURL.map(RecordingLimits.fileSize(at:)) ?? 0
         let tooLarge = RecordingLimits.exceedsUploadLimit(fileSize: videoSize)
-        try await configuration.client.submitTestResult(result, videoURL: tooLarge ? nil : pendingVideoURL)
+        let recovery = crashRecovery
+        try await configuration.client.submitTestResult(
+            result, videoURL: tooLarge ? nil : pendingVideoURL, crashLogURL: recovery?.crashLogURL)
         markTestCompleted(configuration)
-        var savedToPhotos = false
-        if let videoURL = pendingVideoURL { savedToPhotos = await saveToCameraRoll(videoURL) }
+        var savedToPhotos = recovery?.savedToPhotos ?? false
+        if recovery == nil, let videoURL = pendingVideoURL { savedToPhotos = await saveToCameraRoll(videoURL) }
         let scene = overlay?.presenter?.view.window?.windowScene
         await dismissMenu()
         await finishSession()
@@ -367,6 +437,8 @@ public final class BuildBarberSessionManager: ObservableObject {
         awaitingFeedback = false
         checkedItems.removeAll()
         if let videoURL { try? FileManager.default.removeItem(at: videoURL) }
+        crashRecovery = nil
+        CrashReporter.endSession()
         currentTest = nil
     }
 }

@@ -7,16 +7,30 @@ struct ChecklistMenuView: View {
 
     let test: BuildBarberTest
     @ObservedObject var sessionManager: BuildBarberSessionManager
+    var initialFeedback = ""
     let onSubmit: (String?, String, String, [String]) async throws -> Void
 
     @State private var testerEmail = UserDefaults.standard.string(forKey: Self.appleEmailDefaultsKey) ?? ""
     @State private var signInError: String?
-    @State private var feedback = ""
+    @State private var feedback: String
     @State private var isSubmitting = false
     @State private var submissionError: String?
     @State private var errorDetails: String?
     @State private var showingErrorDetails = false
     @Environment(\.dismiss) private var dismiss
+
+    init(
+        test: BuildBarberTest,
+        sessionManager: BuildBarberSessionManager,
+        initialFeedback: String = "",
+        onSubmit: @escaping (String?, String, String, [String]) async throws -> Void
+    ) {
+        self.test = test
+        self.sessionManager = sessionManager
+        self.initialFeedback = initialFeedback
+        self.onSubmit = onSubmit
+        _feedback = State(initialValue: initialFeedback)
+    }
 
     var body: some View {
         NavigationStack {

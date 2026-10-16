@@ -216,13 +216,25 @@ public struct BuildBarberClient: Sendable {
     }
 
     /// Submits the result as JSON, then attaches the recording to the created test record.
-    public func submitTestResult(_ result: BuildBarberTestResult, videoURL: URL? = nil) async throws {
+    public func submitTestResult(
+        _ result: BuildBarberTestResult, videoURL: URL? = nil, crashLogURL: URL? = nil
+    ) async throws {
         let data = try await send(request: makeResultRequest(result))
-        guard let videoURL else { return }
+        guard videoURL != nil || crashLogURL != nil else { return }
 
         let response = try JSONDecoder().decode(TestResultResponse.self, from: data)
-        let endpoint = try makeVideoRequestURL(testRecordId: response.testRecordId)
-        try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
-            .upload(videoURL: videoURL)
+        if let videoURL {
+            let endpoint = try makeVideoRequestURL(testRecordId: response.testRecordId)
+            try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
+                .upload(videoURL: videoURL)
+        }
+        if let crashLogURL {
+            // Best effort: the result itself has already been recorded.
+            if let endpoint = try? makeRequest(
+                method: "POST", path: "/tests/\(response.testRecordId)/crash-log").url {
+                try? await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
+                    .upload(fileURL: crashLogURL, field: "crashLog", mimeType: "text/plain")
+            }
+        }
     }
 }
