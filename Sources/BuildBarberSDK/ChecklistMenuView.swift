@@ -56,7 +56,7 @@ struct ChecklistMenuView: View {
                     switch result {
                     case .success(let authorization):
                         if let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                           let email = credential.email {
+                           let email = credential.email ?? Self.email(fromIdentityToken: credential.identityToken) {
                             testerEmail = email
                             UserDefaults.standard.set(email, forKey: Self.appleEmailDefaultsKey)
                             signInError = nil
@@ -108,28 +108,33 @@ struct ChecklistMenuView: View {
                         .font(.caption)
                 }
 
-                HStack {
-                    if test.showPassFailButtons {
-                        Button("Pass") {
-                            submit(outcome: "pass")
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(isSubmitting)
-
-                        Button("Fail") {
-                            submit(outcome: "fail")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(isSubmitting)
-                    } else {
-                        Button("Submit feedback") {
-                            submit(outcome: nil)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
+                if test.showPassFailButtons {
+                    Button("Pass") {
+                        submit(outcome: "pass")
                     }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(isSubmitting)
+
+                    Button("Fail") {
+                        submit(outcome: "fail")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(isSubmitting)
+                } else {
+                    Button("Submit feedback") {
+                        submit(outcome: nil)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
                 }
-                .padding([.horizontal, .bottom])
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 16)
+                .frame(maxWidth: .infinity)
+                .background(.bar)
             }
             .navigationTitle(test.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -147,6 +152,20 @@ struct ChecklistMenuView: View {
                 Text(errorDetails ?? "")
             }
         }
+    }
+
+    /// Apple only populates `credential.email` on the first authorization; the identity token's
+    /// `email` claim is present on every sign-in.
+    private static func email(fromIdentityToken token: Data?) -> String? {
+        guard let token, let jwt = String(data: token, encoding: .utf8) else { return nil }
+        let parts = jwt.split(separator: ".")
+        guard parts.count > 1 else { return nil }
+        var base64 = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        while base64.count % 4 != 0 { base64 += "=" }
+        guard let data = Data(base64Encoded: base64),
+              let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let email = claims["email"] as? String, !email.isEmpty else { return nil }
+        return email
     }
 
     private func submit(outcome: String?) {

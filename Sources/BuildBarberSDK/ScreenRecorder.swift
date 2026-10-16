@@ -45,12 +45,17 @@ final class SampleWriter: @unchecked Sendable {
         try? FileManager.default.removeItem(at: url)
         let w = try AVAssetWriter(outputURL: url, fileType: .mp4)
         // Fragments keep the file playable if the app crashes before the writer is finalized.
-        w.movieFragmentInterval = CMTime(seconds: 2, preferredTimescale: 600)
+        w.movieFragmentInterval = CMTime(seconds: 0.2, preferredTimescale: 600)
         let v = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: Int(dims.width),
             AVVideoHeightKey: Int(dims.height),
-            AVVideoCompressionPropertiesKey: [AVVideoAverageBitRateKey: RecordingLimits.videoBitRate]
+            AVVideoCompressionPropertiesKey: [
+                AVVideoAverageBitRateKey: RecordingLimits.videoBitRate,
+                // Frequent keyframes let each 0.2s fragment be decoded independently after a crash.
+                AVVideoMaxKeyFrameIntervalDurationKey: 0.2,
+                AVVideoAllowFrameReorderingKey: false
+            ]
         ])
         v.expectsMediaDataInRealTime = true
         let a = AVAssetWriterInput(mediaType: .audio, outputSettings: [
