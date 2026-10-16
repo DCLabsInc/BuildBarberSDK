@@ -44,6 +44,8 @@ final class SampleWriter: @unchecked Sendable {
         let dims = CMVideoFormatDescriptionGetDimensions(format)
         try? FileManager.default.removeItem(at: url)
         let w = try AVAssetWriter(outputURL: url, fileType: .mp4)
+        // Fragments keep the file playable if the app crashes before the writer is finalized.
+        w.movieFragmentInterval = CMTime(seconds: 2, preferredTimescale: 600)
         let v = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: Int(dims.width),
@@ -96,6 +98,9 @@ final class ScreenRecorder: NSObject {
 
     var isRecording: Bool { stream != nil }
 
+    /// The file currently being written, if recording.
+    var currentVideoFileName: String? { writer?.url.lastPathComponent }
+
     /// Asks the user (via the system picker) which content to share, then starts capturing.
     func start() async throws {
         guard stream == nil else { return }
@@ -103,8 +108,7 @@ final class ScreenRecorder: NSObject {
         let config = SCStreamConfiguration()
         config.capturesAudio = true
 
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("session-\(UUID().uuidString).mp4")
+        let url = CrashReporter.videoURL(fileName: "session-\(UUID().uuidString).mp4")
         let writer = SampleWriter(url: url)
         output.writer = writer
         output.onStop = { [weak self] error in
