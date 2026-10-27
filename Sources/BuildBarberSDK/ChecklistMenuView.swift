@@ -17,10 +17,12 @@ private struct RewardBanner: View {
                     .foregroundStyle(.yellow)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(reward.title)
+                    Text("🎁 Reward: \(reward.description)")
                         .font(.headline)
-                    if let description = reward.description, !description.isEmpty {
-                        Text(description)
+                    if let group = reward.groupTitle, !group.isEmpty, group != reward.description {
+                        Text(group)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -72,7 +74,7 @@ struct SessionConfirmationView: View {
             VStack(alignment: .leading, spacing: 16) {
                 if let reward {
                     RewardBanner(reward: reward, signedIn: false)
-                    Text("Record your session to earn the \(reward.title) reward. Then sign in with Apple when you submit your test result to get your reward instructions.")
+                    Text("Record your session to earn the reward: \(reward.description). Then sign in with Apple when you submit your test result to get your reward instructions.")
                 } else {
                     Text("Test session recording")
                         .font(.title2.weight(.semibold))
