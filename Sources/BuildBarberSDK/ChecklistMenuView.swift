@@ -35,6 +35,32 @@ struct ChecklistMenuView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 12) {
+                if let reward = test.reward {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: "gift.fill")
+                                .font(.title2)
+                                .foregroundStyle(.orange)
+                                .accessibilityHidden(true)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(reward.title)
+                                    .font(.headline)
+                                if let description = reward.description, !description.isEmpty {
+                                    Text(description)
+                                        .font(.subheadline)
+                                }
+                            }
+                        }
+                        Text("Complete this test to earn your reward!")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.yellow.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.45)))
+                    .padding(.horizontal)
+                }
+
                 Text(test.instructions)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal)

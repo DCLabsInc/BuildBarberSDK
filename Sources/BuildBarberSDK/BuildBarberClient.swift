@@ -23,6 +23,11 @@ public enum BuildBarberTestType: String, Codable, Sendable {
     case release = "Release"
 }
 
+public struct SdkRewardInfo: Decodable, Sendable {
+    public let title: String
+    public let description: String?
+}
+
 public struct BuildBarberTest: Decodable, Sendable {
     public struct ChecklistItem: Decodable, Sendable {
         public let key: String
@@ -34,6 +39,7 @@ public struct BuildBarberTest: Decodable, Sendable {
     public let instructions: String
     public let checklist: [ChecklistItem]
     public let showPassFailButtons: Bool
+    public let reward: SdkRewardInfo?
 }
 
 public struct BuildBarberTestResult: Encodable, Sendable {
@@ -188,6 +194,7 @@ public struct BuildBarberClient: Sendable {
 
     struct TestDefinitionResponse: Decodable, Sendable {
         let showPassFailButtons: Bool
+        let reward: SdkRewardInfo?
     }
 
     func makeDefinitionRequest(testType: BuildBarberTestType, codeword: String) throws -> URLRequest {
@@ -199,8 +206,12 @@ public struct BuildBarberClient: Sendable {
 
     /// Whether the backend allows Pass/Fail buttons for this test (`showPassFailButtons`).
     public func fetchShowPassFailButtons(testType: BuildBarberTestType, codeword: String) async throws -> Bool {
+        try await fetchTestDefinition(testType: testType, codeword: codeword).showPassFailButtons
+    }
+
+    func fetchTestDefinition(testType: BuildBarberTestType, codeword: String) async throws -> TestDefinitionResponse {
         let data = try await send(request: makeDefinitionRequest(testType: testType, codeword: codeword))
-        return try JSONDecoder().decode(TestDefinitionResponse.self, from: data).showPassFailButtons
+        return try JSONDecoder().decode(TestDefinitionResponse.self, from: data)
     }
 
     struct TestResultResponse: Decodable, Sendable {

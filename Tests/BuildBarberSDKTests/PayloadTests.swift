@@ -137,4 +137,27 @@ import Foundation
         let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
         #expect(decoded.showPassFailButtons == false)
     }
+
+    @Test func decodesRewardFromDefinition() throws {
+        let json = #"{"showPassFailButtons":true,"reward":{"title":"Free coffee","description":"Enjoy a coffee on us."}}"#
+        let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
+        #expect(decoded.reward?.title == "Free coffee")
+        #expect(decoded.reward?.description == "Enjoy a coffee on us.")
+    }
+
+    @Test(arguments: [
+        #"{"showPassFailButtons":false}"#,
+        #"{"showPassFailButtons":false,"reward":null}"#
+    ])
+    func missingOrNullRewardIsAccepted(json: String) throws {
+        let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
+        #expect(decoded.reward == nil)
+    }
+
+    @Test func testModelDecodesReward() throws {
+        let json = #"{"title":"Test","instructions":"Try it.","checklist":[],"showPassFailButtons":false,"reward":{"title":"Prize"}}"#
+        let decoded = try JSONDecoder().decode(BuildBarberTest.self, from: Data(json.utf8))
+        #expect(decoded.reward?.title == "Prize")
+        #expect(decoded.reward?.description == nil)
+    }
 }
