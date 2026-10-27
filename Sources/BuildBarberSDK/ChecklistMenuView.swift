@@ -118,7 +118,7 @@ struct ChecklistMenuView: View {
                     .frame(minHeight: 100, maxHeight: 160)
                     .overlay(alignment: .topLeading) {
                         if feedback.isEmpty {
-                            Text("Feedback for developer")
+                            Text("What did you like, dislike or think should be added?")
                                 .foregroundStyle(.secondary)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 8)
