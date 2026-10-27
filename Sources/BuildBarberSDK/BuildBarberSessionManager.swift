@@ -214,9 +214,12 @@ public final class BuildBarberSessionManager: ObservableObject {
     }
 
     private func presentConfirmation(from viewController: UIViewController) {
+        let reward = currentTest?.reward
         let alert = UIAlertController(
-            title: "Test session recording",
-            message: "Recording helps us fix more bugs. On next screen tap 'Share entire screen' then tap anywhere below to start testing.",
+            title: reward == nil ? "Test session recording" : "Record for reward!",
+            message: reward.map {
+                "Record your session to earn the \($0.title) reward. Then Sign in with Apple when you submit your test result to get your reward instructions."
+            } ?? "Recording helps us fix more bugs. On next screen tap 'Share entire screen' then tap anywhere below to start testing.",
             preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Don't record", style: .cancel) { [weak self] _ in
             Task { @MainActor in await self?.beginRecording(from: viewController, record: false) }
