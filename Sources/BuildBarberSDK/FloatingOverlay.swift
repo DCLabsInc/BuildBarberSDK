@@ -27,9 +27,10 @@ final class FloatingOverlay {
         window.rootViewController = root
 
         var config = UIButton.Configuration.filled()
-        config.image = UIImage(systemName: "record.circle.fill")
+        config.image = UIImage(systemName: "pencil.and.list.clipboard")
         config.cornerStyle = .capsule
-        config.baseBackgroundColor = .systemRed
+        config.baseBackgroundColor = .black
+        config.baseForegroundColor = .yellow
         let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in self?.onTap() })
         button.accessibilityLabel = "Session menu"
         button.translatesAutoresizingMaskIntoConstraints = false

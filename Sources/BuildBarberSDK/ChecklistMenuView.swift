@@ -41,7 +41,7 @@ private struct BuildBarberBrand: View {
             Image("tache", bundle: .module)
                 .resizable()
                 .scaledToFit()
-                .frame(width: 28, height: 28)
+                .frame(width: 36, height: 36)
                 .accessibilityHidden(true)
             Text("BuildBarber")
                 .font(.headline)
@@ -86,10 +86,12 @@ struct SessionConfirmationView: View {
                     Button("Don't record") { choose(record: false) }
                         .buttonStyle(.bordered)
                         .tint(.yellow)
+                        .foregroundStyle(.black)
                     Spacer()
                     Button("Record session") { choose(record: true) }
                         .buttonStyle(.borderedProminent)
                         .tint(.yellow)
+                        .foregroundStyle(.black)
                 }
             }
             .padding(24)
@@ -158,34 +160,43 @@ struct ChecklistMenuView: View {
                 .scrollDismissesKeyboard(.interactively)
                 .simultaneousGesture(TapGesture().onEnded { feedbackIsFocused = false })
 
-                SignInWithAppleButton(.signIn) { request in
-                    request.requestedScopes = [.email]
-                } onCompletion: { result in
-                    switch result {
-                    case .success(let authorization):
-                        if let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                           let email = credential.email ?? Self.email(fromIdentityToken: credential.identityToken) {
-                            testerEmail = email
-                            isSignedIn = true
-                            UserDefaults.standard.set(email, forKey: Self.appleEmailDefaultsKey)
-                            signInError = nil
-                        } else {
-                            isSignedIn = true
-                            signInError = nil
-                        }
-                    case .failure(let error):
-                        if let authorizationError = error as? ASAuthorizationError,
-                           authorizationError.code == .unknown {
-                            signInError = "Sign in with Apple failed. Check that the host app has the Sign in with Apple capability enabled."
-                        } else {
-                            signInError = error.localizedDescription
+                if isSignedIn {
+                    HStack(spacing: 8) {
+                        Image(systemName: "apple.logo")
+                        Text("Signed in as \(testerEmail)")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal)
+                } else {
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.email]
+                    } onCompletion: { result in
+                        switch result {
+                        case .success(let authorization):
+                            if let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                               let email = credential.email ?? Self.email(fromIdentityToken: credential.identityToken) {
+                                testerEmail = email
+                                isSignedIn = true
+                                UserDefaults.standard.set(email, forKey: Self.appleEmailDefaultsKey)
+                                signInError = nil
+                            } else {
+                                isSignedIn = true
+                                signInError = nil
+                            }
+                        case .failure(let error):
+                            if let authorizationError = error as? ASAuthorizationError,
+                               authorizationError.code == .unknown {
+                                signInError = "Sign in with Apple failed. Check that the host app has the Sign in with Apple capability enabled."
+                            } else {
+                                signInError = error.localizedDescription
+                            }
                         }
                     }
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 44)
+                    .padding(.horizontal)
+                    .simultaneousGesture(TapGesture().onEnded { feedbackIsFocused = false })
                 }
-                .signInWithAppleButtonStyle(.black)
-                .frame(height: 44)
-                .padding(.horizontal)
-                .simultaneousGesture(TapGesture().onEnded { feedbackIsFocused = false })
 
                 if let signInError {
                     Text(signInError)
@@ -224,6 +235,7 @@ struct ChecklistMenuView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.yellow)
+                    .foregroundStyle(.black)
                     .disabled(isSubmitting)
 
                     Button("Fail") {
@@ -231,6 +243,7 @@ struct ChecklistMenuView: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(.yellow)
+                    .foregroundStyle(.black)
                     .disabled(isSubmitting)
                 } else {
                     Button("Submit feedback") {
@@ -238,6 +251,7 @@ struct ChecklistMenuView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(.yellow)
+                    .foregroundStyle(.black)
                     .disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
                 }
                 Spacer()
