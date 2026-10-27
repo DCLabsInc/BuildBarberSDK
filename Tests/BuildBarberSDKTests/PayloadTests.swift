@@ -95,6 +95,18 @@ import Foundation
         #expect(json["outcome"] == nil)
     }
 
+    @Test func emptyTesterEmailUsesAnonymousAddress() throws {
+        let result = BuildBarberTestResult(
+            testType: .feature,
+            codeword: "code",
+            testerEmail: "  \n",
+            outcome: nil,
+            feedback: "Feedback",
+            checkedItems: [])
+        let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(result)) as? [String: Any])
+        #expect(json["testerEmail"] as? String == "anonymous@nowhere.com")
+    }
+
     @Test func errorBodyDecodes() throws {
         let body = try JSONDecoder().decode(APIErrorBody.self, from: Data(#"{"error":"bad_key","message":"nope"}"#.utf8))
         #expect(body.error == "bad_key")

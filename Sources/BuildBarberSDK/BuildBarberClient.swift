@@ -54,7 +54,11 @@ public struct BuildBarberTestResult: Encodable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(testType, forKey: .testType)
         try container.encode(codeword, forKey: .codeword)
-        try container.encode(testerEmail, forKey: .testerEmail)
+        try container.encode(
+            testerEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "anonymous@nowhere.com"
+                : testerEmail,
+            forKey: .testerEmail)
         try container.encodeIfPresent(outcome, forKey: .outcome)
         try container.encode(feedback, forKey: .feedback)
         try container.encode(checkedItems, forKey: .checkedItems)

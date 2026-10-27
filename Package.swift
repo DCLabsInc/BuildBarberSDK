@@ -8,7 +8,7 @@ let package = Package(
         .library(name: "BuildBarberSDK", targets: ["BuildBarberSDK"])
     ],
     targets: [
-        .target(name: "BuildBarberSDK"),
+        .target(name: "BuildBarberSDK", resources: [.process("Resources")]),
         .testTarget(name: "BuildBarberSDKTests", dependencies: ["BuildBarberSDK"])
     ]
 )

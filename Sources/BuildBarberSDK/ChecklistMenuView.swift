@@ -1,6 +1,106 @@
 #if canImport(UIKit) && canImport(ScreenCaptureKit)
 import AuthenticationServices
 import SwiftUI
+import UIKit
+
+private struct RewardBanner: View {
+    let reward: SdkRewardInfo
+    let signedIn: Bool
+
+    private var accent: Color { signedIn ? .green : .yellow }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "gift.fill")
+                    .font(.title2)
+                    .foregroundStyle(.yellow)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(reward.title)
+                        .font(.headline)
+                    if let description = reward.description, !description.isEmpty {
+                        Text(description)
+                    }
+                }
+            }
+            Text(signedIn ? "Signed in. Reward pending." : "Sign in below for reward")
+                .font(.subheadline.weight(.semibold))
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(accent.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(accent.opacity(0.75)))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct BuildBarberBrand: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image("tache", bundle: .module)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 28, height: 28)
+                .accessibilityHidden(true)
+            Text("BuildBarber")
+                .font(.headline)
+                .foregroundStyle(.primary)
+        }
+        .fixedSize()
+        .accessibilityElement(children: .combine)
+    }
+}
+
+struct SessionConfirmationView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let reward: SdkRewardInfo?
+    let onChoose: (Bool) -> Void
+
+    private func choose(record: Bool) {
+        Task { @MainActor in
+            dismiss()
+            try? await Task.sleep(for: .milliseconds(300))
+            onChoose(record)
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.7).ignoresSafeArea()
+            VStack(alignment: .leading, spacing: 16) {
+                if let reward {
+                    RewardBanner(reward: reward, signedIn: false)
+                    Text("Record your session to earn the \(reward.title) reward. Then sign in with Apple when you submit your test result to get your reward instructions.")
+                } else {
+                    Text("Test session recording")
+                        .font(.title2.weight(.semibold))
+                    Text("Recording helps us fix more bugs. On the next screen, tap “Share entire screen,” then tap anywhere below to start testing.")
+                }
+
+                BuildBarberBrand()
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+
+                HStack {
+                    Button("Don't record") { choose(record: false) }
+                        .buttonStyle(.bordered)
+                        .tint(.yellow)
+                    Spacer()
+                    Button("Record session") { choose(record: true) }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.yellow)
+                }
+            }
+            .padding(24)
+            .frame(maxWidth: 420)
+            .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.yellow.opacity(0.7)))
+            .padding(24)
+        }
+        .preferredColorScheme(.dark)
+    }
+}
 
 struct ChecklistMenuView: View {
     private static let appleEmailDefaultsKey = "com.buildbarber.sdk.testerEmail"
@@ -11,6 +111,7 @@ struct ChecklistMenuView: View {
     let onSubmit: (String?, String, String, [String]) async throws -> Void
 
     @State private var testerEmail = UserDefaults.standard.string(forKey: Self.appleEmailDefaultsKey) ?? ""
+    @State private var isSignedIn = !(UserDefaults.standard.string(forKey: Self.appleEmailDefaultsKey) ?? "").isEmpty
     @State private var signInError: String?
     @State private var feedback: String
     @State private var isSubmitting = false
@@ -18,6 +119,7 @@ struct ChecklistMenuView: View {
     @State private var errorDetails: String?
     @State private var showingErrorDetails = false
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var feedbackIsFocused: Bool
 
     init(
         test: BuildBarberTest,
@@ -36,37 +138,25 @@ struct ChecklistMenuView: View {
         NavigationStack {
             VStack(spacing: 12) {
                 if let reward = test.reward {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack(alignment: .top, spacing: 12) {
-                            Image(systemName: "gift.fill")
-                                .font(.title2)
-                                .foregroundStyle(.orange)
-                                .accessibilityHidden(true)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(reward.description!)
-                                    .font(.headline)
-                            }
-                        }
-                        Text("Sign in below for reward")
-                            .font(.subheadline.weight(.semibold))
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.yellow.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.orange.opacity(0.45)))
+                    RewardBanner(reward: reward, signedIn: isSignedIn)
                     .padding(.horizontal)
+                    .onTapGesture { feedbackIsFocused = false }
                 }
 
                 List(test.checklist, id: \.key) { item in
                     Button {
                         sessionManager.toggleChecklistItem(key: item.key)
                     } label: {
-                        Label(item.label, systemImage: sessionManager.checkedChecklistItemKeys.contains(item.key) ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(.primary)
+                        HStack {
+                            Image(systemName: sessionManager.checkedChecklistItemKeys.contains(item.key) ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(.yellow)
+                            Text(item.label)
+                                .foregroundStyle(.primary)
+                        }
                     }
                 }
-                
-                //Text("Sign in with Apple to fill in your email address.").font(.caption)
+                .scrollDismissesKeyboard(.interactively)
+                .simultaneousGesture(TapGesture().onEnded { feedbackIsFocused = false })
 
                 SignInWithAppleButton(.signIn) { request in
                     request.requestedScopes = [.email]
@@ -76,10 +166,12 @@ struct ChecklistMenuView: View {
                         if let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
                            let email = credential.email ?? Self.email(fromIdentityToken: credential.identityToken) {
                             testerEmail = email
+                            isSignedIn = true
                             UserDefaults.standard.set(email, forKey: Self.appleEmailDefaultsKey)
                             signInError = nil
-                        } else if testerEmail.isEmpty {
-                            signInError = "Apple did not provide an email address. Enter it below to continue."
+                        } else {
+                            isSignedIn = true
+                            signInError = nil
                         }
                     case .failure(let error):
                         if let authorizationError = error as? ASAuthorizationError,
@@ -93,6 +185,7 @@ struct ChecklistMenuView: View {
                 .signInWithAppleButtonStyle(.black)
                 .frame(height: 44)
                 .padding(.horizontal)
+                .simultaneousGesture(TapGesture().onEnded { feedbackIsFocused = false })
 
                 if let signInError {
                     Text(signInError)
@@ -100,14 +193,9 @@ struct ChecklistMenuView: View {
                         .font(.caption)
                 }
 
-                TextField("Tester email", text: $testerEmail)
-                    .textInputAutocapitalization(.never)
-                    .keyboardType(.emailAddress)
-                    .textFieldStyle(.roundedBorder)
-                    .padding(.horizontal)
-
                 TextEditor(text: $feedback)
-                    .frame(minHeight: 70, maxHeight: 70)
+                    .focused($feedbackIsFocused)
+                    .frame(minHeight: 60, maxHeight: 60)
                     .overlay(alignment: .topLeading) {
                         if feedback.isEmpty {
                             Text("What did you like, dislike or think should be added?")
@@ -119,6 +207,7 @@ struct ChecklistMenuView: View {
                     }
                     .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.4)))
                     .padding(.horizontal)
+                    .padding(.bottom, 5)
 
                 if let submissionError {
                     Text(submissionError)
@@ -134,21 +223,27 @@ struct ChecklistMenuView: View {
                         submit(outcome: "pass")
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(.yellow)
                     .disabled(isSubmitting)
 
                     Button("Fail") {
                         submit(outcome: "fail")
                     }
                     .buttonStyle(.bordered)
+                    .tint(.yellow)
                     .disabled(isSubmitting)
                 } else {
                     Button("Submit feedback") {
                         submit(outcome: nil)
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(.yellow)
                     .disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
                 }
+                Spacer()
+                BuildBarberBrand()
             }
+            .simultaneousGesture(TapGesture().onEnded { feedbackIsFocused = false })
             .padding(.horizontal)
             .padding(.vertical, 16)
                 .frame(maxWidth: .infinity)
@@ -156,6 +251,7 @@ struct ChecklistMenuView: View {
             }
             .navigationTitle(test.title)
             .navigationBarTitleDisplayMode(.inline)
+            .tint(.yellow)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("X") { dismiss() }
@@ -170,6 +266,7 @@ struct ChecklistMenuView: View {
                 Text(errorDetails ?? "")
             }
         }
+        .preferredColorScheme(.dark)
     }
 
     /// Apple only populates `credential.email` on the first authorization; the identity token's

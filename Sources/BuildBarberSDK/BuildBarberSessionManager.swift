@@ -135,6 +135,7 @@ public final class BuildBarberSessionManager: ObservableObject {
 
         isShowingRepeatPrompt = true
         let alert = UIAlertController(title: "Perform another test?", message: nil, preferredStyle: .alert)
+        Self.stylePopup(alert)
         alert.addAction(UIAlertAction(title: "No", style: .cancel) { [weak self] _ in
             self?.isShowingRepeatPrompt = false
         })
@@ -215,19 +216,13 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     private func presentConfirmation(from viewController: UIViewController) {
         let reward = currentTest?.reward
-        let alert = UIAlertController(
-            title: reward == nil ? "Test session recording" : "Record for reward!",
-            message: reward.map {
-                "Record your session to earn the \($0.title) reward. Then Sign in with Apple when you submit your test result to get your reward instructions."
-            } ?? "Recording helps us fix more bugs. On next screen tap 'Share entire screen' then tap anywhere below to start testing.",
-            preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "Don't record", style: .cancel) { [weak self] _ in
-            Task { @MainActor in await self?.beginRecording(from: viewController, record: false) }
+        let host = UIHostingController(rootView: SessionConfirmationView(reward: reward) { [weak self, weak viewController] record in
+            guard let self, let viewController else { return }
+            Task { @MainActor in await self.beginRecording(from: viewController, record: record) }
         })
-        alert.addAction(UIAlertAction(title: "Record session", style: .default) { [weak self] _ in
-            Task { @MainActor in await self?.beginRecording(from: viewController, record: true) }
-        })
-        viewController.present(alert, animated: true)
+        host.modalPresentationStyle = .overFullScreen
+        host.view.backgroundColor = .clear
+        viewController.present(host, animated: true)
     }
 
     private func beginRecording(from viewController: UIViewController, record: Bool) async {
@@ -244,6 +239,7 @@ public final class BuildBarberSessionManager: ObservableObject {
                         title: "Couldn't start recording",
                         message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))\n\nYou can still submit your feedback without a video.",
                         preferredStyle: .alert)
+                    Self.stylePopup(alert)
                     alert.addAction(UIAlertAction(title: "OK", style: .default))
                     Self.topMost(from: viewController).present(alert, animated: true)
                 }
@@ -289,6 +285,7 @@ public final class BuildBarberSessionManager: ObservableObject {
             title: "Recording stopped",
             message: "Recording stopped automatically after about \(minutes) minutes to keep the video under 100 MB. Please submit your feedback now.",
             preferredStyle: .alert)
+        Self.stylePopup(alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
             Task { @MainActor in self?.presentMenu() }
         })
@@ -316,8 +313,14 @@ public final class BuildBarberSessionManager: ObservableObject {
             title: "Video too large to upload",
             message: "Your recording is \(megabytes) MB, which is over the 100 MB upload limit, so it was not uploaded. Your feedback was submitted. \(location)",
             preferredStyle: .alert)
+        Self.stylePopup(alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         Self.topMost(from: root).present(alert, animated: true)
+    }
+
+    private static func stylePopup(_ alert: UIAlertController) {
+        alert.overrideUserInterfaceStyle = .dark
+        alert.view.tintColor = .systemYellow
     }
 
     // MARK: Menu
