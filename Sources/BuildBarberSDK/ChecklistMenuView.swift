@@ -43,7 +43,7 @@ struct ChecklistMenuView: View {
                                 .foregroundStyle(.orange)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(reward.description)
+                                Text(reward.description!)
                                     .font(.headline)
                             }
                         }
