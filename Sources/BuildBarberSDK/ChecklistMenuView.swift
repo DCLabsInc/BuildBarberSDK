@@ -17,7 +17,7 @@ private struct RewardBanner: View {
                     .foregroundStyle(.yellow)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("🎁 Reward: \(reward.description)")
+                    Text("Reward: \(reward.description)")
                         .font(.headline)
                     if let group = reward.groupTitle, !group.isEmpty, group != reward.description {
                         Text(group)
