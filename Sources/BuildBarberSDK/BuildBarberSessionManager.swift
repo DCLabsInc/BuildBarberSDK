@@ -101,8 +101,8 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     private func beginCrashFeedback(in scene: UIWindowScene) async {
         guard let configuration, let recovery = crashRecovery, !isActive else { return }
-        let showPassFail = (try? await configuration.client.fetchShowPassFailButtons(
-            testType: configuration.testType, codeword: configuration.codeword)) ?? false
+        let definition = try? await configuration.client.fetchTestDefinition(
+            testType: configuration.testType, codeword: configuration.codeword)
         guard !isActive else { return }
         checkedItems.removeAll()
         currentTest = BuildBarberTest(
@@ -111,7 +111,8 @@ public final class BuildBarberSessionManager: ObservableObject {
             checklist: configuration.checklistItems.map {
                 BuildBarberTest.ChecklistItem(key: $0, label: $0, kind: "task")
             },
-            showPassFailButtons: showPassFail)
+            showPassFailButtons: definition?.showPassFailButtons ?? false,
+            reward: definition?.reward)
         isActive = true
         awaitingFeedback = true
         pendingVideoURL = recovery.videoURL
@@ -178,8 +179,8 @@ public final class BuildBarberSessionManager: ObservableObject {
         checkedItems.removeAll()
         Task { @MainActor in
             // If the definition can't be fetched, fall back to the feedback-only flow.
-            let showPassFail = (try? await configuration.client.fetchShowPassFailButtons(
-                testType: configuration.testType, codeword: configuration.codeword)) ?? false
+            let definition = try? await configuration.client.fetchTestDefinition(
+                testType: configuration.testType, codeword: configuration.codeword)
             guard !self.isActive else { return }
             self.currentTest = BuildBarberTest(
                 title: "Test session",
@@ -187,7 +188,8 @@ public final class BuildBarberSessionManager: ObservableObject {
                 checklist: configuration.checklistItems.map {
                     BuildBarberTest.ChecklistItem(key: $0, label: $0, kind: "task")
                 },
-                showPassFailButtons: showPassFail)
+                showPassFailButtons: definition?.showPassFailButtons ?? false,
+                reward: definition?.reward)
             self.presentConfirmation(from: viewController)
         }
     }
