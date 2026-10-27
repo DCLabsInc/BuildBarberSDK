@@ -44,7 +44,7 @@ private struct BuildBarberBrand: View {
                 .resizable()
                 .scaledToFit()
                 .frame(width: 36, height: 36)
-                .accessibilityHidden(true) *
+                .accessibilityHidden(true) */
             Text("👨🏼 BuildBarber")
                 .font(.headline)
                 .foregroundStyle(.primary)
