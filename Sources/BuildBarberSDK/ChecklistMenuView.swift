@@ -87,8 +87,8 @@ struct SessionConfirmationView: View {
                 HStack {
                     Button("Don't record") { choose(record: false) }
                         .buttonStyle(.bordered)
-                        .tint(.yellow)
-                        .foregroundStyle(.black)
+                        .tint(.black)
+                        .foregroundStyle(.white)
                     Spacer()
                     Button("Record session") { choose(record: true) }
                         .buttonStyle(.borderedProminent)
@@ -244,8 +244,8 @@ struct ChecklistMenuView: View {
                         submit(outcome: "fail")
                     }
                     .buttonStyle(.bordered)
-                    .tint(.yellow)
-                    .foregroundStyle(.black)
+                    .tint(.black)
+                    .foregroundStyle(.white)
                     .disabled(isSubmitting)
                 } else {
                     Button("Submit feedback") {

@@ -1,5 +1,36 @@
 #if canImport(UIKit)
+import SwiftUI
 import UIKit
+
+private struct FloatingClipboardButton: View {
+    let onTap: () -> Void
+    @State private var isWiggling = false
+
+    var body: some View {
+        Button(action: onTap) {
+            Image(systemName: "list.bullet.clipboard")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(.yellow)
+                .symbolEffect(.wiggle, isActive: isWiggling)
+                .frame(width: 40, height: 40)
+                .background(.black, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Session menu")
+        .task {
+            while !Task.isCancelled {
+                isWiggling = true
+                do {
+                    try await Task.sleep(for: .milliseconds(700))
+                    isWiggling = false
+                    try await Task.sleep(for: .milliseconds(4_300))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+}
 
 /// A window that only intercepts touches that land on its button.
 final class PassthroughWindow: UIWindow {
@@ -26,21 +57,18 @@ final class FloatingOverlay {
         root.view.backgroundColor = .clear
         window.rootViewController = root
 
-        var config = UIButton.Configuration.filled()
-        config.image = UIImage(systemName: "pencil.and.list.clipboard")
-        config.cornerStyle = .capsule
-        config.baseBackgroundColor = .black
-        config.baseForegroundColor = .yellow
-        let button = UIButton(configuration: config, primaryAction: UIAction { [weak self] _ in self?.onTap() })
-        button.accessibilityLabel = "Session menu"
-        button.translatesAutoresizingMaskIntoConstraints = false
-        root.view.addSubview(button)
+        let host = UIHostingController(rootView: FloatingClipboardButton(onTap: onTap))
+        host.view.backgroundColor = .clear
+        host.view.translatesAutoresizingMaskIntoConstraints = false
+        root.addChild(host)
+        root.view.addSubview(host.view)
+        host.didMove(toParent: root)
         // Sits just below the status bar area (safe area top), centered.
         NSLayoutConstraint.activate([
-            button.centerXAnchor.constraint(equalTo: root.view.centerXAnchor),
-            button.topAnchor.constraint(equalTo: root.view.safeAreaLayoutGuide.topAnchor, constant: 4),
-            button.widthAnchor.constraint(equalToConstant: size),
-            button.heightAnchor.constraint(equalToConstant: size)
+            host.view.centerXAnchor.constraint(equalTo: root.view.centerXAnchor),
+            host.view.topAnchor.constraint(equalTo: root.view.safeAreaLayoutGuide.topAnchor, constant: 4),
+            host.view.widthAnchor.constraint(equalToConstant: size),
+            host.view.heightAnchor.constraint(equalToConstant: size)
         ])
         window.isHidden = false
         self.window = window
