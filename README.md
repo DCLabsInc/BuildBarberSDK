@@ -46,8 +46,13 @@ final class FeedbackViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        guard let apiKey = BuildBarberAppConfiguration.apiKey() else {
+            assertionFailure("Missing SDKAPIKey in Info.plist; see Config.template.xcconfig")
+            return
+        }
+
         BuildBarberSessionManager.shared.configure(
-            apiKey: "YOUR_CLIENT_API_KEY",
+            apiKey: apiKey,
             testType: .feature,
             codeword: "YOUR_CODEWORD",
             checklistItems: [
@@ -63,6 +68,16 @@ final class FeedbackViewController: UIViewController {
     }
 }
 ```
+
+### Keeping the API key out of source control
+
+1. Copy `Config.template.xcconfig` to `Config.xcconfig` (git-ignored) in your
+   app's project root and set `SDK_API_KEY = your_actual_key_here`.
+2. Assign `Config.xcconfig` to your target's build configurations
+   (Project > Info > Configurations).
+3. Add `SDKAPIKey` = `$(SDK_API_KEY)` to your app's Info.plist.
+4. Add `Config.xcconfig` to `.gitignore`. Commit only the template, and have
+   teammates copy it.
 
 Call `startFeedbackSession()` from an app control such as a “Send feedback”
 button. The SDK asks the user to confirm, then presents Apple's content-sharing
