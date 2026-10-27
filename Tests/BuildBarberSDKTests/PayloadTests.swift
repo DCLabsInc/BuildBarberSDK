@@ -151,10 +151,10 @@ import Foundation
     }
 
     @Test func decodesRewardFromDefinition() throws {
-        let json = #"{"showPassFailButtons":true,"reward":{"title":"Free coffee","description":"Enjoy a coffee on us."}}"#
+        let json = #"{"showPassFailButtons":true,"reward":{"description":"Free coffee","groupTitle":"Perks"}}"#
         let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
-        #expect(decoded.reward?.title == "Free coffee")
-        #expect(decoded.reward?.description == "Enjoy a coffee on us.")
+        #expect(decoded.reward?.description == "Free coffee")
+        #expect(decoded.reward?.groupTitle == "Perks")
     }
 
     @Test(arguments: [
@@ -167,9 +167,9 @@ import Foundation
     }
 
     @Test func testModelDecodesReward() throws {
-        let json = #"{"title":"Test","instructions":"Try it.","checklist":[],"showPassFailButtons":false,"reward":{"title":"Prize"}}"#
+        let json = #"{"title":"Test","instructions":"Try it.","checklist":[],"showPassFailButtons":false,"reward":{"description":null,"groupTitle":"Prize"}}"#
         let decoded = try JSONDecoder().decode(BuildBarberTest.self, from: Data(json.utf8))
-        #expect(decoded.reward?.title == "Prize")
-        #expect(decoded.reward?.description == nil)
+        #expect(decoded.reward?.description == "Prize")
+        #expect(decoded.reward?.groupTitle == "Prize")
     }
 }
