@@ -43,15 +43,11 @@ struct ChecklistMenuView: View {
                                 .foregroundStyle(.orange)
                                 .accessibilityHidden(true)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(reward.title)
+                                Text(reward.description)
                                     .font(.headline)
-                                if let description = reward.description, !description.isEmpty {
-                                    Text(description)
-                                        .font(.subheadline)
-                                }
                             }
                         }
-                        Text("Complete this test to earn your reward!")
+                        Text("Sign in below for reward")
                             .font(.subheadline.weight(.semibold))
                     }
                     .padding()
@@ -61,10 +57,6 @@ struct ChecklistMenuView: View {
                     .padding(.horizontal)
                 }
 
-                Text(test.instructions)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-
                 List(test.checklist, id: \.key) { item in
                     Button {
                         sessionManager.toggleChecklistItem(key: item.key)
@@ -73,8 +65,8 @@ struct ChecklistMenuView: View {
                             .foregroundStyle(.primary)
                     }
                 }
-                Text("Sign in with Apple to fill in your email address.")
-                    .font(.caption)
+                
+                //Text("Sign in with Apple to fill in your email address.").font(.caption)
 
                 SignInWithAppleButton(.signIn) { request in
                     request.requestedScopes = [.email]
@@ -115,7 +107,7 @@ struct ChecklistMenuView: View {
                     .padding(.horizontal)
 
                 TextEditor(text: $feedback)
-                    .frame(minHeight: 100, maxHeight: 160)
+                    .frame(minHeight: 70, maxHeight: 70)
                     .overlay(alignment: .topLeading) {
                         if feedback.isEmpty {
                             Text("What did you like, dislike or think should be added?")
