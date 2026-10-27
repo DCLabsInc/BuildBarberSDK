@@ -26,7 +26,7 @@ private struct RewardBanner: View {
                     }
                 }
             }
-            Text(signedIn ? "Signed in. Reward pending." : "Sign in below for reward")
+            Text(signedIn ? "Signed in. Reward pending." : "Sign in for reward")
                 .font(.subheadline.weight(.semibold))
         }
         .padding()
