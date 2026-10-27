@@ -9,10 +9,10 @@ private struct FloatingClipboardButton: View {
     var body: some View {
         Button(action: onTap) {
             Image(systemName: "list.bullet.clipboard")
-                .font(.system(size: 38, weight: .medium))
+                .font(.system(size: 32, weight: .medium))
                 .foregroundStyle(.yellow)
                 .symbolEffect(.wiggle, isActive: isWiggling)
-                .frame(width: 80, height: 80)
+                .frame(width: 60, height: 60)
                 .background(.black, in: Capsule())
         }
         .buttonStyle(.plain)
