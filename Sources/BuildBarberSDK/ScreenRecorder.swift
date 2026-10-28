@@ -72,9 +72,16 @@ final class SampleWriter: @unchecked Sendable {
             AVEncoderBitRateKey: RecordingLimits.audioBitRate
         ])
         a.expectsMediaDataInRealTime = true
-        if w.canAdd(v) { w.add(v) }
-        if w.canAdd(a) { w.add(a) }
-        writer = w; video = v; audio = a
+        guard w.canAdd(v) else {
+            throw RecorderError.writerFailed("The video encoder is not supported on this device.")
+        }
+        w.add(v)
+        if w.canAdd(a) {
+            w.add(a)
+            audio = a
+        }
+        writer = w
+        video = v
     }
 
     /// Finishes the file. Returns nil if nothing was recorded.
