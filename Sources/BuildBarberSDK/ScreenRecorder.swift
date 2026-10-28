@@ -1,11 +1,18 @@
-#if canImport(UIKit) && canImport(ScreenCaptureKit)
+#if canImport(UIKit) && canImport(ReplayKit)
 import AVFoundation
-import ScreenCaptureKit
+import ReplayKit
 import UIKit
 
-enum RecorderError: Error, Sendable {
-    case cancelled
+enum RecorderError: Error, LocalizedError, Sendable {
+    case unavailable
     case writerFailed(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .unavailable: return "Screen recording is not available on this device."
+        case .writerFailed(let message): return message
+        }
+    }
 }
 
 /// Writes captured sample buffers to a file. All mutation happens on `queue`.
@@ -21,26 +28,26 @@ final class SampleWriter: @unchecked Sendable {
     init(url: URL) { self.url = url }
 
     /// Must be called on `queue`.
-    func append(_ buffer: CMSampleBuffer, type: SCStreamOutputType) {
+    func append(_ buffer: CMSampleBuffer, type: RPSampleBufferType) {
         guard !finished, buffer.isValid, CMSampleBufferDataIsReady(buffer) else { return }
         do {
             if writer == nil { try setUp(for: buffer, type: type) }
             guard let writer, writer.status == .writing || writer.status == .unknown else { return }
             if !started {
-                guard type == .screen else { return }
+                guard type == .video else { return }
                 guard writer.startWriting() else { return }
                 writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(buffer))
                 started = true
             }
-            let input = (type == .screen) ? video : audio
+            let input = (type == .video) ? video : (type == .audioApp ? audio : nil)
             if let input, input.isReadyForMoreMediaData { input.append(buffer) }
         } catch {
             finished = true
         }
     }
 
-    private func setUp(for buffer: CMSampleBuffer, type: SCStreamOutputType) throws {
-        guard type == .screen, let format = CMSampleBufferGetFormatDescription(buffer) else { return }
+    private func setUp(for buffer: CMSampleBuffer, type: RPSampleBufferType) throws {
+        guard type == .video, let format = CMSampleBufferGetFormatDescription(buffer) else { return }
         let dims = CMVideoFormatDescriptionGetDimensions(format)
         try? FileManager.default.removeItem(at: url)
         let w = try AVAssetWriter(outputURL: url, fileType: .mp4)
@@ -91,99 +98,66 @@ final class SampleWriter: @unchecked Sendable {
     }
 }
 
-/// Wraps SCStream and the content sharing picker.
+/// Captures the app's screen and audio with ReplayKit.
 @MainActor
-final class ScreenRecorder: NSObject {
-    private var stream: SCStream?
+final class ScreenRecorder {
+    private let screenRecorder = RPScreenRecorder.shared()
     private var writer: SampleWriter?
-    private var pickerContinuation: CheckedContinuation<SCContentFilter, Error>?
-    private let output = StreamOutput()
-    /// Called on the main actor if the stream stops unexpectedly.
+    /// Called on the main actor if capture stops unexpectedly.
     var onStreamError: (@MainActor (Error) -> Void)?
 
-    var isRecording: Bool { stream != nil }
+    var isRecording: Bool { writer != nil }
 
     /// The file currently being written, if recording.
     var currentVideoFileName: String? { writer?.url.lastPathComponent }
 
-    /// Asks the user (via the system picker) which content to share, then starts capturing.
+    /// Starts capturing the app's screen and audio.
     func start() async throws {
-        guard stream == nil else { return }
-        let filter = try await pickContent()
-        let config = SCStreamConfiguration()
-        config.capturesAudio = true
+        guard writer == nil else { return }
+        guard screenRecorder.isAvailable else { throw RecorderError.unavailable }
 
         let url = CrashReporter.videoURL(fileName: "session-\(UUID().uuidString).mp4")
         let writer = SampleWriter(url: url)
-        output.writer = writer
-        output.onStop = { [weak self] error in
-            Task { @MainActor in self?.handleStop(error) }
-        }
-        let stream = SCStream(filter: filter, configuration: config, delegate: output)
-        try stream.addStreamOutput(output, type: .screen, sampleHandlerQueue: writer.queue)
-        try stream.addStreamOutput(output, type: .audio, sampleHandlerQueue: writer.queue)
-        try await stream.startCapture()
-        self.stream = stream
         self.writer = writer
+        screenRecorder.isMicrophoneEnabled = false
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            screenRecorder.startCapture(handler: { [weak self] sampleBuffer, type, error in
+                if let error {
+                    Task { @MainActor in self?.handleStop(error) }
+                    return
+                }
+                writer.queue.async {
+                    writer.append(sampleBuffer, type: type)
+                }
+            }, completionHandler: { error in
+                Task { @MainActor in
+                    if let error {
+                        self.writer = nil
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume()
+                    }
+                }
+            })
+        }
     }
 
     /// Stops capture and returns the finalized video URL, if any frames were written.
     func stop() async -> URL? {
-        let stream = self.stream, writer = self.writer
-        self.stream = nil
+        guard let writer else { return nil }
         self.writer = nil
-        try? await stream?.stopCapture()
-        return await writer?.finish()
-    }
-
-    private func handleStop(_ error: Error) {
-        guard stream != nil else { return }
-        onStreamError?(error)
-    }
-
-    private func pickContent() async throws -> SCContentFilter {
-        let picker = SCContentSharingPicker.shared
-        picker.add(self)
-        picker.isActive = true
-        defer { picker.remove(self); picker.isActive = false }
-        return try await withCheckedThrowingContinuation { cont in
-            pickerContinuation = cont
-            picker.present()
+        return await withCheckedContinuation { continuation in
+            screenRecorder.stopCapture { _ in
+                Task {
+                    continuation.resume(returning: await writer.finish())
+                }
+            }
         }
     }
 
-    private func resolvePicker(_ result: sending Result<SCContentFilter, Error>) {
-        pickerContinuation?.resume(with: result)
-        pickerContinuation = nil
-    }
-}
-
-extension ScreenRecorder: SCContentSharingPickerObserver {
-    nonisolated func contentSharingPicker(_ picker: SCContentSharingPicker, didUpdateWith filter: SCContentFilter, for stream: SCStream?) {
-        nonisolated(unsafe) let filter = filter
-        Task { @MainActor in self.resolvePicker(.success(filter)) }
-    }
-
-    nonisolated func contentSharingPicker(_ picker: SCContentSharingPicker, didCancelFor stream: SCStream?) {
-        Task { @MainActor in self.resolvePicker(.failure(RecorderError.cancelled)) }
-    }
-
-    nonisolated func contentSharingPickerStartDidFailWithError(_ error: any Error) {
-        Task { @MainActor in self.resolvePicker(.failure(error)) }
-    }
-}
-
-private final class StreamOutput: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
-    var writer: SampleWriter?
-    var onStop: (@Sendable (Error) -> Void)?
-
-    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
-        // Invoked on writer.queue.
-        writer?.append(sampleBuffer, type: type)
-    }
-
-    func stream(_ stream: SCStream, didStopWithError error: any Error) {
-        onStop?(error)
+    private func handleStop(_ error: Error) {
+        guard writer != nil else { return }
+        onStreamError?(error)
     }
 }
 #endif

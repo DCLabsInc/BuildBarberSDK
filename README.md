@@ -80,10 +80,9 @@ final class FeedbackViewController: UIViewController {
    teammates copy it.
 
 Call `startFeedbackSession()` from an app control such as a “Send feedback”
-button. The SDK asks the user to confirm, then presents Apple's content-sharing
-picker; recording begins only after the user selects what to share. The SDK
-records screen and audio, and displays a floating button for opening the session
-menu.
+button. The SDK asks the user to confirm, then starts recording the app's screen
+and audio with ReplayKit. It also displays a floating button for opening the
+session menu.
 
 ## Checklist items
 
