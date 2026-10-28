@@ -1,4 +1,4 @@
-#if canImport(UIKit) && canImport(ScreenCaptureKit)
+#if canImport(UIKit) && canImport(ReplayKit)
 import AuthenticationServices
 import SwiftUI
 import UIKit
@@ -37,7 +37,7 @@ private struct RewardBanner: View {
     }
 }
 
-private struct BuildBarberBrand: View {
+private struct TestBarberBrand: View {
     var body: some View {
         HStack(spacing: 8) {
            /* Image("tache", bundle: .module)
@@ -45,7 +45,7 @@ private struct BuildBarberBrand: View {
                 .scaledToFit()
                 .frame(width: 36, height: 36)
                 .accessibilityHidden(true) */
-            Text("👨🏼 BuildBarber")
+            Text("👨🏼 TestBarber")
                 .font(.headline)
                 .foregroundStyle(.primary)
         }
@@ -78,10 +78,10 @@ struct SessionConfirmationView: View {
                 } else {
                     Text("Test session recording")
                         .font(.title2.weight(.semibold))
-                    Text("Recording helps us fix more bugs. On the next screen, tap “Share entire screen,” then tap anywhere below to start testing.")
+                    Text("Recording helps us fix more bugs. Once recording starts, return to your app and test as usual.")
                 }
 
-                BuildBarberBrand()
+                TestBarberBrand()
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                 HStack {
@@ -257,7 +257,7 @@ struct ChecklistMenuView: View {
                     .disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
                 }
                 Spacer()
-                BuildBarberBrand()
+                TestBarberBrand()
             }
             .simultaneousGesture(TapGesture().onEnded { feedbackIsFocused = false })
             .padding(.horizontal)

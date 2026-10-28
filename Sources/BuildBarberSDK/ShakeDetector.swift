@@ -1,4 +1,4 @@
-#if canImport(UIKit) && canImport(ScreenCaptureKit)
+#if canImport(UIKit) && canImport(ReplayKit)
 import CoreMotion
 import Foundation
 

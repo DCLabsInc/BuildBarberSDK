@@ -1,4 +1,4 @@
-#if canImport(UIKit) && canImport(ScreenCaptureKit)
+#if canImport(UIKit) && canImport(ReplayKit)
 import Combine
 import Photos
 import SwiftUI
@@ -234,15 +234,13 @@ public final class BuildBarberSessionManager: ObservableObject {
             } catch {
                 // The session continues without video so testers can still submit feedback.
                 recording = false
-                if case RecorderError.cancelled = error {} else {
-                    let alert = UIAlertController(
-                        title: "Couldn't start recording",
-                        message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))\n\nYou can still submit your feedback without a video.",
-                        preferredStyle: .alert)
-                    Self.stylePopup(alert)
-                    alert.addAction(UIAlertAction(title: "OK", style: .default))
-                    Self.topMost(from: viewController).present(alert, animated: true)
-                }
+                let alert = UIAlertController(
+                    title: "Couldn't start recording",
+                    message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))\n\nYou can still submit your feedback without a video.",
+                    preferredStyle: .alert)
+                Self.stylePopup(alert)
+                alert.addAction(UIAlertAction(title: "OK", style: .default))
+                Self.topMost(from: viewController).present(alert, animated: true)
             }
         }
         isActive = true
