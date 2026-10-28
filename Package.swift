@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "BuildBarberSDK",
-    platforms: [.iOS("27.0")],
+    platforms: [.iOS("17.0")],
     products: [
         .library(name: "BuildBarberSDK", targets: ["BuildBarberSDK"])
     ],
