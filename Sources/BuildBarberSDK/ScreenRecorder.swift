@@ -127,19 +127,40 @@ final class ScreenRecorder {
         let writer = SampleWriter(url: url)
         self.writer = writer
         screenRecorder.isMicrophoneEnabled = false
+        let queue = writer.queue
+        let recorder = screenRecorder
+        let onError: @Sendable (Error) -> Void = { [weak self] error in
+            Task { @MainActor in self?.handleStop(error) }
+        }
+        let onStartFailed: @Sendable @MainActor () -> Void = { [weak self] in
+            self?.writer = nil
+        }
+        // ReplayKit invokes these closures off the main queue, so they are built in a
+        // nonisolated context and only hop to the main actor explicitly.
+        try await Self.startCapture(
+            recorder: recorder, writer: writer, queue: queue, onError: onError, onStartFailed: onStartFailed)
+    }
+
+    private nonisolated static func startCapture(
+        recorder: RPScreenRecorder,
+        writer: SampleWriter,
+        queue: DispatchQueue,
+        onError: @escaping @Sendable (Error) -> Void,
+        onStartFailed: @escaping @Sendable @MainActor () -> Void
+    ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            screenRecorder.startCapture(handler: { [weak self] sampleBuffer, type, error in
+            recorder.startCapture(handler: { @Sendable sampleBuffer, type, error in
                 if let error {
-                    Task { @MainActor in self?.handleStop(error) }
+                    onError(error)
                     return
                 }
-                writer.queue.async {
+                queue.async {
                     writer.append(sampleBuffer, type: type)
                 }
-            }, completionHandler: { error in
+            }, completionHandler: { @Sendable error in
                 Task { @MainActor in
                     if let error {
-                        self.writer = nil
+                        onStartFailed()
                         continuation.resume(throwing: error)
                     } else {
                         continuation.resume()

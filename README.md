@@ -30,6 +30,20 @@ Select the `BuildBarberSDK` library for your app target.
 > Photos permission and saves the video to the camera roll after a successful
 > submission.
 
+Other Info.plist privacy keys depend on which features you enable:
+
+| Key | When it is required |
+| --- | --- |
+| `NSPhotoLibraryAddUsageDescription` | Required if saving the captured video to Photos. |
+| `NSMicrophoneUsageDescription` | Only if microphone recording is enabled (the SDK currently does not record the microphone). |
+| `NSCameraUsageDescription` | Only if camera preview/capture is enabled (the SDK currently does not use the camera). |
+
+> [!NOTE]
+> Call `startSession(presentingFrom:)` on the main thread. If called from an early
+> lifecycle hook such as SwiftUI `onAppear`, the SDK waits briefly (about 2.5
+> seconds at most) for a foreground-active scene and a presenter attached to a
+> window before presenting.
+
 ## Configure and start a session
 
 Configure the shared session manager before offering the session flow to users.

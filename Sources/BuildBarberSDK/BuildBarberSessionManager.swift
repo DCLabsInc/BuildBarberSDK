@@ -99,6 +99,41 @@ public final class BuildBarberSessionManager: ObservableObject {
             .first(where: { $0.activationState == .foregroundActive })
     }
 
+    /// Deterministic top-most controller: active foreground scene, its key window, then the presented chain.
+    private static func topMostViewController() -> UIViewController? {
+        guard let scene = activeScene() else { return nil }
+        let windows = scene.windows.filter { !($0 is PassthroughWindow) }
+        guard let root = (windows.first(where: { $0.isKeyWindow }) ?? windows.first)?.rootViewController
+        else { return nil }
+        return topMost(from: root)
+    }
+
+    private static let readinessRetryLimit = 10
+    private static let readinessRetryDelay: Duration = .milliseconds(250)
+
+    /// Waits briefly for a foreground-active scene and a presenter attached to a window.
+    /// Returns nil if they are still not ready after a bounded number of retries.
+    private static func readyPresenter(for viewController: UIViewController) async -> UIViewController? {
+        for attempt in 0...readinessRetryLimit {
+            if let window = viewController.viewIfLoaded?.window,
+               window.windowScene?.activationState == .foregroundActive {
+                return viewController
+            }
+            if attempt < readinessRetryLimit { try? await Task.sleep(for: readinessRetryDelay) }
+        }
+        return nil
+    }
+
+    /// Waits briefly for a foreground-active scene; returns nil after a bounded number of retries.
+    private static func readyScene(preferred: UIWindowScene?) async -> UIWindowScene? {
+        for attempt in 0...readinessRetryLimit {
+            if let preferred, preferred.activationState == .foregroundActive { return preferred }
+            if let scene = activeScene() { return scene }
+            if attempt < readinessRetryLimit { try? await Task.sleep(for: readinessRetryDelay) }
+        }
+        return nil
+    }
+
     private func beginCrashFeedback(in scene: UIWindowScene) async {
         guard let configuration, let recovery = crashRecovery, !isActive else { return }
         let definition = try? await configuration.client.fetchTestDefinition(
@@ -124,13 +159,8 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     private func handleShake() {
         guard configuration != nil, !isActive, !isShowingRepeatPrompt,
-              let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive }),
-              let window = scene.windows.first(where: { !($0 is PassthroughWindow) && $0.isKeyWindow })
-                ?? scene.windows.first(where: { !($0 is PassthroughWindow) }),
-              let root = window.rootViewController
+              let presenter = Self.topMostViewController()
         else { return }
-        let presenter = Self.topMost(from: root)
         if presenter is UIAlertController { return }
 
         isShowingRepeatPrompt = true
@@ -169,11 +199,15 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     // MARK: Session start
 
+    @MainActor
     public func startSession(presentingFrom viewController: UIViewController) {
         startSession(presentingFrom: viewController, ignoringPreviousCompletion: false)
     }
 
     private func startSession(presentingFrom viewController: UIViewController, ignoringPreviousCompletion: Bool) {
+        #if DEBUG
+        dispatchPrecondition(condition: .onQueue(.main))
+        #endif
         guard let configuration, !isActive,
               ignoringPreviousCompletion || !hasCompletedTest(configuration)
         else { return }
@@ -191,7 +225,12 @@ public final class BuildBarberSessionManager: ObservableObject {
                 },
                 showPassFailButtons: definition?.showPassFailButtons ?? false,
                 reward: definition?.reward)
-            self.presentConfirmation(from: viewController)
+            // SwiftUI hosts may call this from onAppear before the scene/presenter is ready.
+            guard let presenter = await Self.readyPresenter(for: viewController), !self.isActive else {
+                self.currentTest = nil
+                return
+            }
+            self.presentConfirmation(from: presenter)
         }
     }
 
@@ -250,8 +289,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         recorder.onStreamError = { [weak self] _ in
             Task { @MainActor in await self?.handleInterruption() }
         }
-        if let scene = viewController.view.window?.windowScene
-            ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
+        if let scene = await Self.readyScene(preferred: viewController.viewIfLoaded?.window?.windowScene) {
             let overlay = FloatingOverlay { [weak self] in self?.presentMenu() }
             overlay.show(in: scene)
             self.overlay = overlay
