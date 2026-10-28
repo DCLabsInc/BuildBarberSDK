@@ -141,7 +141,7 @@ final class ScreenRecorder {
             recorder: recorder, writer: writer, queue: queue, onError: onError, onStartFailed: onStartFailed)
     }
 
-    private nonisolated static func startCapture(
+    private static func startCapture(
         recorder: RPScreenRecorder,
         writer: SampleWriter,
         queue: DispatchQueue,
