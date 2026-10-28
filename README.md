@@ -5,7 +5,7 @@ user feedback for a test session so it will all appear in the BuildBarber portal
 
 ## Requirements
 
-- iOS 17.0 or later
+- iOS 18.0 or later
 - Xcode with Swift Package Manager support
 
 ## Add the package
