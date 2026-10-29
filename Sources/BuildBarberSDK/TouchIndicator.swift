@@ -2,7 +2,7 @@
 import ObjectiveC
 import UIKit
 
-/// Draws a semi-transparent yellow dot under every finger so taps are visible in the recording.
+/// Draws a semi-transparent orange dot under every finger so taps are visible in the recording.
 ///
 /// Touches are observed by swizzling `UIApplication.sendEvent(_:)`. To make sure the dot reaches the
 /// video before whatever a tap triggers (for example a crash), the touch-up of a quick tap is held
@@ -70,7 +70,7 @@ final class TouchIndicator {
         let dot = UIView(frame: CGRect(x: 0, y: 0, width: size, height: size))
         dot.center = location
         dot.layer.cornerRadius = size / 2
-        dot.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.5)
+        dot.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.5)
         dot.isUserInteractionEnabled = false
         hostView.addSubview(dot)
         tracked[key] = Tracked(dot: dot, startTime: ProcessInfo.processInfo.systemUptime, startLocation: location)

@@ -2,6 +2,34 @@ import Testing
 import Foundation
 @testable import BuildBarberSDK
 
+@Suite struct AppleSignInEmailTests {
+    @Test func credentialEmailTakesPrecedence() {
+        #expect(AppleSignInEmail.resolve(credentialEmail: "tester@example.com", identityToken: nil)
+            == "tester@example.com")
+    }
+
+    @Test func extractsEmailFromIdentityToken() throws {
+        let payload = Data(#"{"email":"tester@example.com"}"#.utf8)
+        let encodedPayload = payload.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        let token = Data("header.\(encodedPayload).signature".utf8)
+
+        #expect(AppleSignInEmail.resolve(credentialEmail: nil, identityToken: token)
+            == "tester@example.com")
+    }
+
+    @Test(arguments: [
+        Data("not-a-token".utf8),
+        Data("header.%%% .signature".utf8),
+        Data("header.e30.signature".utf8)
+    ])
+    func missingOrMalformedEmailReturnsNil(identityToken: Data) {
+        #expect(AppleSignInEmail.resolve(credentialEmail: nil, identityToken: identityToken) == nil)
+    }
+}
+
 @Suite struct PayloadTests {
     @Test func multipartContainsPartsAndTerminator() {
         var form = MultipartFormData(boundary: "B")
