@@ -121,8 +121,8 @@ checked item in the session menu.
 
 ## Recording limits
 
-The portal accepts videos up to 100 MB. The SDK records at a fixed bitrate and
-automatically stops recording after about 5 minutes 20 seconds, showing an
+The portal accepts videos up to 100 MB. The SDK records at a fixed 1 Mbps bitrate (downscaled to at most 1280 px on the long side) and
+automatically stops recording after about 10 minutes 40 seconds, showing an
 alert and then the session menu. If a finished recording is still over 100 MB,
 the video is not uploaded; the feedback is still submitted, the video is saved
 to Photos, and the tester is told to upload it manually from their library.
