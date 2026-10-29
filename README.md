@@ -75,9 +75,7 @@ final class FeedbackViewController: UIViewController {
                 "Review walk history"
             ]
         )
-    }
 
-    func startFeedbackSession() {
         BuildBarberSessionManager.shared.startSession(presentingFrom: self)
     }
 }
@@ -93,8 +91,8 @@ final class FeedbackViewController: UIViewController {
 4. Add `Config.xcconfig` to `.gitignore`. Commit only the template, and have
    teammates copy it.
 
-Call `startFeedbackSession()` from an app control such as a “Send feedback”
-button. The SDK asks the user to confirm, then starts recording the app's screen
+Add this to the first view controller your app opens, so the session starts from
+`viewDidLoad`. The SDK asks the user to confirm, then starts recording the app's screen
 and audio with ReplayKit. It also displays a floating button for opening the
 session menu.
 
