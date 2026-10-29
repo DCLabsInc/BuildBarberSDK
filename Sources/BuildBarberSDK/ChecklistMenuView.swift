@@ -7,14 +7,14 @@ private struct RewardBanner: View {
     let reward: SdkRewardInfo
     let signedIn: Bool
 
-    private var accent: Color { signedIn ? .green : .yellow }
+    private var accent: Color { signedIn ? .green : .orange }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "gift.fill")
                     .font(.title2)
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(.orange)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Reward: \(reward.description)")
@@ -87,14 +87,14 @@ struct SessionConfirmationView: View {
                     Spacer()
                     Button("Record session") { choose(record: true) }
                         .buttonStyle(.borderedProminent)
-                        .tint(.yellow)
+                        .tint(.orange)
                         .foregroundStyle(.black)
                 }
             }
             .padding(24)
             .frame(maxWidth: 420)
             .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 20))
-            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.yellow.opacity(0.7)))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.orange.opacity(0.7)))
             .padding(24)
         }
         .preferredColorScheme(.dark)
@@ -148,7 +148,7 @@ struct ChecklistMenuView: View {
                     } label: {
                         HStack {
                             Image(systemName: sessionManager.checkedChecklistItemKeys.contains(item.key) ? "checkmark.square.fill" : "square")
-                                .foregroundStyle(.yellow)
+                                .foregroundStyle(.orange)
                             Text(item.label)
                                 .foregroundStyle(.primary)
                         }
@@ -170,16 +170,20 @@ struct ChecklistMenuView: View {
                     } onCompletion: { result in
                         switch result {
                         case .success(let authorization):
-                            if let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
-                               let email = credential.email ?? Self.email(fromIdentityToken: credential.identityToken) {
-                                testerEmail = email
-                                isSignedIn = true
-                                UserDefaults.standard.set(email, forKey: Self.appleEmailDefaultsKey)
-                                signInError = nil
-                            } else {
-                                isSignedIn = true
-                                signInError = nil
+                            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                                  let email = AppleSignInEmail.resolve(
+                                    credentialEmail: credential.email,
+                                    identityToken: credential.identityToken
+                                  )
+                            else {
+                                isSignedIn = false
+                                signInError = "Apple sign-in succeeded, but no email was provided. Please try again."
+                                return
                             }
+                            testerEmail = email
+                            isSignedIn = true
+                            UserDefaults.standard.set(email, forKey: Self.appleEmailDefaultsKey)
+                            signInError = nil
                         case .failure(let error):
                             if let authorizationError = error as? ASAuthorizationError,
                                authorizationError.code == .unknown {
@@ -231,7 +235,7 @@ struct ChecklistMenuView: View {
                         submit(outcome: "pass")
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.yellow)
+                    .tint(.orange)
                     .foregroundStyle(.black)
                     .disabled(isSubmitting)
 
@@ -247,7 +251,7 @@ struct ChecklistMenuView: View {
                         submit(outcome: nil)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.yellow)
+                    .tint(.orange)
                     .foregroundStyle(.black)
                     .disabled(feedback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
                 }
@@ -262,7 +266,7 @@ struct ChecklistMenuView: View {
             }
             .navigationTitle(test.title)
             .navigationBarTitleDisplayMode(.inline)
-            .tint(.yellow)
+            .tint(.orange)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("X") { dismiss() }
@@ -278,20 +282,6 @@ struct ChecklistMenuView: View {
             }
         }
         .preferredColorScheme(.dark)
-    }
-
-    /// Apple only populates `credential.email` on the first authorization; the identity token's
-    /// `email` claim is present on every sign-in.
-    private static func email(fromIdentityToken token: Data?) -> String? {
-        guard let token, let jwt = String(data: token, encoding: .utf8) else { return nil }
-        let parts = jwt.split(separator: ".")
-        guard parts.count > 1 else { return nil }
-        var base64 = parts[1].replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
-        while base64.count % 4 != 0 { base64 += "=" }
-        guard let data = Data(base64Encoded: base64),
-              let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let email = claims["email"] as? String, !email.isEmpty else { return nil }
-        return email
     }
 
     private func submit(outcome: String?) {

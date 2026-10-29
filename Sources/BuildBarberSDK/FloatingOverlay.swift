@@ -10,7 +10,7 @@ private struct FloatingClipboardButton: View {
         Button(action: onTap) {
             Image(systemName: "list.bullet.clipboard")
                 .font(.system(size: 32, weight: .medium))
-                .foregroundStyle(.yellow)
+                .foregroundStyle(.orange)
                 .symbolEffect(.wiggle, isActive: isWiggling)
                 .frame(width: 60, height: 60)
                 .background(.black, in: Capsule())

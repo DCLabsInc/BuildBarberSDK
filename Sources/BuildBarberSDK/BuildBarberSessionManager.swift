@@ -10,7 +10,7 @@ import UserNotifications
 public final class BuildBarberSessionManager: ObservableObject {
     public static let shared = BuildBarberSessionManager()
 
-    /// Shows a yellow dot under each touch in the recorded video.
+    /// Shows an orange dot under each touch in the recorded video.
     public var showsTouchIndicator = true
     /// How long a quick tap is held back so the dot reaches the video before the app reacts, in seconds. 0 disables.
     public var tapDelay: TimeInterval = 0.2
@@ -356,7 +356,7 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     private static func stylePopup(_ alert: UIAlertController) {
         alert.overrideUserInterfaceStyle = .dark
-        alert.view.tintColor = .systemYellow
+        alert.view.tintColor = .systemOrange
     }
 
     // MARK: Menu
