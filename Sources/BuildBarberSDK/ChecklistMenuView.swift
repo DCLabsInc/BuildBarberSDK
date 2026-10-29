@@ -40,12 +40,7 @@ private struct RewardBanner: View {
 private struct TestBarberBrand: View {
     var body: some View {
         HStack(spacing: 8) {
-           /* Image("tache", bundle: .module)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 36, height: 36)
-                .accessibilityHidden(true) */
-            Text("👨🏼 TestBarber")
+            Text("🍊 TestJuice")
                 .font(.headline)
                 .foregroundStyle(.primary)
         }
