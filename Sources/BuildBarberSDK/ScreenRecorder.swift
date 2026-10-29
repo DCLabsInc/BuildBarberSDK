@@ -49,18 +49,19 @@ final class SampleWriter: @unchecked Sendable {
     private func setUp(for buffer: CMSampleBuffer, type: RPSampleBufferType) throws {
         guard type == .video, let format = CMSampleBufferGetFormatDescription(buffer) else { return }
         let dims = CMVideoFormatDescriptionGetDimensions(format)
+        let size = RecordingLimits.scaledSize(width: Int(dims.width), height: Int(dims.height))
         try? FileManager.default.removeItem(at: url)
         let w = try AVAssetWriter(outputURL: url, fileType: .mp4)
         // Fragments keep the file playable if the app crashes before the writer is finalized.
-        w.movieFragmentInterval = CMTime(seconds: 0.1, preferredTimescale: 600)
+        w.movieFragmentInterval = CMTime(seconds: RecordingLimits.keyFrameInterval, preferredTimescale: 600)
         let v = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: Int(dims.width),
-            AVVideoHeightKey: Int(dims.height),
+            AVVideoWidthKey: size.width,
+            AVVideoHeightKey: size.height,
             AVVideoCompressionPropertiesKey: [
                 AVVideoAverageBitRateKey: RecordingLimits.videoBitRate,
-                // Frequent keyframes let each 0.1s fragment be decoded independently after a crash.
-                AVVideoMaxKeyFrameIntervalDurationKey: 0.1,
+                // Each fragment starts with a keyframe so it can be decoded independently after a crash.
+                AVVideoMaxKeyFrameIntervalDurationKey: RecordingLimits.keyFrameInterval,
                 AVVideoAllowFrameReorderingKey: false
             ]
         ])
