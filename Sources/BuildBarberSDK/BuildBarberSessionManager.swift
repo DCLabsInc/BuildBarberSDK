@@ -461,6 +461,8 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     // Nonisolated so Photos' callbacks, which run on its own queues, are not main-actor isolated.
     private nonisolated static func saveVideoToPhotoLibrary(_ url: URL) async -> Bool {
+        // Requesting access without this Info.plist key terminates the app.
+        guard Bundle.main.object(forInfoDictionaryKey: "NSPhotoLibraryAddUsageDescription") != nil else { return false }
         let status = await withCheckedContinuation { (continuation: CheckedContinuation<PHAuthorizationStatus, Never>) in
             PHPhotoLibrary.requestAuthorization(for: .addOnly) { continuation.resume(returning: $0) }
         }
