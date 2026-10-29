@@ -166,6 +166,7 @@ struct ChecklistMenuView: View {
                     .padding(.horizontal)
                 } else {
                     SignInWithAppleButton(.signIn) { request in
+                        feedbackIsFocused = false
                         request.requestedScopes = [.email]
                     } onCompletion: { result in
                         switch result {
@@ -196,7 +197,6 @@ struct ChecklistMenuView: View {
                     .signInWithAppleButtonStyle(.black)
                     .frame(height: 44)
                     .padding(.horizontal)
-                    .simultaneousGesture(TapGesture().onEnded { feedbackIsFocused = false })
                 }
 
                 if let signInError {
