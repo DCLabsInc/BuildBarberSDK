@@ -281,6 +281,23 @@ struct ChecklistMenuView: View {
                 Text(errorDetails ?? "")
             }
         }
+        .overlay {
+            if isSubmitting {
+                ZStack {
+                    Color.black.opacity(0.5).ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .controlSize(.large)
+                        Text("Submitting test results")
+                            .font(.headline)
+                    }
+                    .padding(24)
+                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .interactiveDismissDisabled(isSubmitting)
         .preferredColorScheme(.dark)
     }
 
