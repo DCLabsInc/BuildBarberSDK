@@ -363,7 +363,10 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     private func presentMenu(initialFeedback: String = "") {
         // A swipe-dismissed sheet leaves a stale reference behind.
-        if let menu = menuController, menu.presentingViewController == nil { menuController = nil }
+        if let menu = menuController, menu.presentingViewController == nil {
+            menuController = nil
+            overlay?.restoreKey()
+        }
         guard menuController == nil, let presenter = overlay?.presenter else { return }
         guard let test = currentTest else { return }
         let view = ChecklistMenuView(test: test, sessionManager: self, initialFeedback: initialFeedback) { [weak self] outcome, email, feedback, checkedItems in
@@ -380,6 +383,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         let host = UIHostingController(rootView: view)
         host.modalPresentationStyle = .pageSheet
         menuController = host
+        overlay?.makeKey()
         presenter.present(host, animated: true)
     }
 
@@ -389,6 +393,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             menu.dismiss(animated: true) { continuation.resume() }
         }
+        overlay?.restoreKey()
     }
 
     // MARK: Lifecycle

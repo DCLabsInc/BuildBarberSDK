@@ -34,6 +34,9 @@ private struct FloatingClipboardButton: View {
 
 /// A window that only intercepts touches that land on its button.
 final class PassthroughWindow: UIWindow {
+    // Becomes key while the menu is up so Sign in with Apple gets a valid presentation anchor.
+    override var canBecomeKey: Bool { true }
+
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
         let view = super.hitTest(point, with: event)
         return view === rootViewController?.view ? nil : view
@@ -80,7 +83,22 @@ final class FloatingOverlay {
     /// Overlay window and root view for drawing tap indicators.
     var overlayWindow: UIWindow? { window }
 
+    private weak var previousKeyWindow: UIWindow?
+
+    func makeKey() {
+        guard let window, !window.isKeyWindow else { return }
+        previousKeyWindow = window.windowScene?.windows.first(where: { $0.isKeyWindow && $0 !== window })
+        window.makeKey()
+    }
+
+    func restoreKey() {
+        guard window?.isKeyWindow == true else { return }
+        previousKeyWindow?.makeKey()
+        previousKeyWindow = nil
+    }
+
     func hide() {
+        restoreKey()
         window?.isHidden = true
         window = nil
     }
