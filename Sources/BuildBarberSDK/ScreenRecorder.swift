@@ -105,6 +105,53 @@ final class SampleWriter: @unchecked Sendable {
     }
 }
 
+/// ReplayKit calls its handlers on background queues. These closures are created outside any
+/// actor-isolated type so they carry no @MainActor isolation (which would trap at runtime).
+enum ReplayKitBridge {
+    // ReplayKit invokes these closures off the main queue. They must be created in a
+    // nonisolated context, otherwise they inherit @MainActor and the runtime traps
+    // (dispatch_assert_queue) when ReplayKit calls them on its own queue.
+    static func startCapture(
+        recorder: RPScreenRecorder,
+        writer: SampleWriter,
+        queue: DispatchQueue,
+        onError: @escaping @Sendable (Error) -> Void,
+        onStartFailed: @escaping @Sendable @MainActor () -> Void
+    ) async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            recorder.startCapture(handler: { @Sendable sampleBuffer, type, error in
+                if let error {
+                    onError(error)
+                    return
+                }
+                queue.async {
+                    writer.append(sampleBuffer, type: type)
+                }
+            }, completionHandler: { @Sendable error in
+                if let error {
+                    Task { @MainActor in
+                        onStartFailed()
+                        continuation.resume(throwing: error)
+                    }
+                } else {
+                    continuation.resume()
+                }
+            })
+        }
+    }
+
+    // Nonisolated for the same reason as `startCapture`: ReplayKit calls the completion
+    // handler on a background queue, and the continuation is resumed exactly once.
+    static func stopCapture(recorder: RPScreenRecorder) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            recorder.stopCapture { @Sendable _ in
+                continuation.resume()
+            }
+        }
+    }
+
+}
+
 /// Captures the app's screen and audio with ReplayKit.
 @MainActor
 final class ScreenRecorder {
@@ -136,58 +183,16 @@ final class ScreenRecorder {
         let onStartFailed: @Sendable @MainActor () -> Void = { [weak self] in
             if self?.writer === writer { self?.writer = nil }
         }
-        try await Self.startCapture(
+        try await ReplayKitBridge.startCapture(
             recorder: recorder, writer: writer, queue: queue, onError: onError, onStartFailed: onStartFailed)
-    }
-
-    // ReplayKit invokes these closures off the main queue. They must be created in a
-    // nonisolated context, otherwise they inherit @MainActor and the runtime traps
-    // (dispatch_assert_queue) when ReplayKit calls them on its own queue.
-    private nonisolated static func startCapture(
-        recorder: RPScreenRecorder,
-        writer: SampleWriter,
-        queue: DispatchQueue,
-        onError: @escaping @Sendable (Error) -> Void,
-        onStartFailed: @escaping @Sendable @MainActor () -> Void
-    ) async throws {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            recorder.startCapture(handler: { @Sendable sampleBuffer, type, error in
-                if let error {
-                    onError(error)
-                    return
-                }
-                queue.async {
-                    writer.append(sampleBuffer, type: type)
-                }
-            }, completionHandler: { @Sendable error in
-                if let error {
-                    Task { @MainActor in
-                        onStartFailed()
-                        continuation.resume(throwing: error)
-                    }
-                } else {
-                    continuation.resume()
-                }
-            })
-        }
     }
 
     /// Stops capture and returns the finalized video URL, if any frames were written.
     func stop() async -> URL? {
         guard let writer else { return nil }
         self.writer = nil
-        await Self.stopCapture(recorder: screenRecorder)
+        await ReplayKitBridge.stopCapture(recorder: screenRecorder)
         return await writer.finish()
-    }
-
-    // Nonisolated for the same reason as `startCapture`: ReplayKit calls the completion
-    // handler on a background queue, and the continuation is resumed exactly once.
-    private nonisolated static func stopCapture(recorder: RPScreenRecorder) async {
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            recorder.stopCapture { @Sendable _ in
-                continuation.resume()
-            }
-        }
     }
 
     private func handleStop(_ error: Error, from source: SampleWriter) {
