@@ -268,6 +268,11 @@ public final class BuildBarberSessionManager: ObservableObject {
         var recording = record
         _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound])
         if record {
+            let hint = RecordingHintOverlay()
+            if let scene = viewController.viewIfLoaded?.window?.windowScene ?? Self.activeScene() {
+                hint.show(in: scene, hasReward: currentTest?.reward != nil)
+            }
+            defer { hint.hide() }
             do {
                 try await recorder.start()
             } catch {
