@@ -81,6 +81,16 @@ final class FeedbackViewController: UIViewController {
 }
 ```
 
+After a crash, the SDK searches up to three directory levels in the app bundle,
+Documents, and (optionally) an App Group container for `.dSYM` bundles. If any
+are present, it uploads them with `crash.log` in one ZIP; otherwise it uploads
+the plain crash log. Configure `dsymAppGroupIdentifier` when your app places
+symbols in an App Group. Installed apps cannot access Xcode DerivedData.
+SwiftPM compiles this SDK into the host app, so its code is normally covered by
+the app executable's dSYM rather than a separate `BuildBarberSDK.dSYM`. A dSYM
+is not normally shipped inside an installed app; the host app must explicitly
+make any dSYM available in one of the searched locations at runtime.
+
 ### Keeping the API key out of source control
 
 1. Copy `Config.template.xcconfig` to `Config.xcconfig` (git-ignored) in your

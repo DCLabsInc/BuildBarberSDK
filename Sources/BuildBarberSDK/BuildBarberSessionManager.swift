@@ -20,6 +20,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         let testType: BuildBarberTestType
         let codeword: String
         let checklistItems: [String]
+        let dsymAppGroupIdentifier: String?
     }
 
     private var configuration: Configuration?
@@ -46,13 +47,15 @@ public final class BuildBarberSessionManager: ObservableObject {
         apiKey: String,
         testType: BuildBarberTestType,
         codeword: String,
-        checklistItems: [String]
+        checklistItems: [String],
+        dsymAppGroupIdentifier: String? = nil
     ) {
         configuration = Configuration(
             client: BuildBarberClient(configuration: BuildBarberConfiguration(apiKey: apiKey)),
             testType: testType,
             codeword: codeword,
-            checklistItems: checklistItems)
+            checklistItems: checklistItems,
+            dsymAppGroupIdentifier: dsymAppGroupIdentifier)
         shakeDetector.start { [weak self] in self?.handleShake() }
         recoverFromCrashIfNeeded()
     }
@@ -453,8 +456,27 @@ public final class BuildBarberSessionManager: ObservableObject {
         let videoSize = pendingVideoURL.map(RecordingLimits.fileSize(at:)) ?? 0
         let tooLarge = RecordingLimits.exceedsUploadLimit(fileSize: videoSize)
         let recovery = crashRecovery
+        let crashArchiveURL: URL?
+        if let crashLogURL = recovery?.crashLogURL {
+            do {
+                crashArchiveURL = try CrashArchiveBundler.makeArchive(
+                    crashLogURL: crashLogURL,
+                    appGroupIdentifier: configuration.dsymAppGroupIdentifier)
+            } catch {
+                NSLog("BuildBarber SDK could not bundle the crash dSYM: %@", error.localizedDescription)
+                crashArchiveURL = nil
+            }
+        } else {
+            crashArchiveURL = nil
+        }
+        defer {
+            if let crashArchiveURL { try? FileManager.default.removeItem(at: crashArchiveURL) }
+        }
         try await configuration.client.submitTestResult(
-            result, videoURL: tooLarge ? nil : pendingVideoURL, crashLogURL: recovery?.crashLogURL)
+            result,
+            videoURL: tooLarge ? nil : pendingVideoURL,
+            crashLogURL: recovery?.crashLogURL,
+            crashArchiveURL: crashArchiveURL)
         markTestCompleted(configuration)
         var savedToPhotos = recovery?.savedToPhotos ?? false
         if recovery == nil, let videoURL = pendingVideoURL { savedToPhotos = await saveToCameraRoll(videoURL) }
