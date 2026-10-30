@@ -30,12 +30,14 @@ struct SessionUploader: Sendable {
         try await upload(fileURL: videoURL, field: "video", mimeType: "video/mp4")
     }
 
-    func upload(fileURL: URL, field: String, mimeType: String) async throws {
+    @discardableResult
+    func upload(fileURL: URL, field: String, mimeType: String) async throws -> Data {
         let (request, body) = try makeUploadRequest(fileURL: fileURL, field: field, mimeType: mimeType)
         let (data, response) = try await session.upload(for: request, from: body)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw Self.error(statusCode: http.statusCode, responseBody: data)
         }
+        return data
     }
 
     static func error(statusCode: Int, responseBody: Data) -> BuildBarberError {
