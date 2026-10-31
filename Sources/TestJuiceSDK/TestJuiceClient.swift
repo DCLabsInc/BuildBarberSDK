@@ -3,22 +3,22 @@ import Foundation
 import FoundationNetworking
 #endif
 
-/// Configuration for talking to the BuildBarber REST API.
-public struct BuildBarberConfiguration: Sendable {
-    /// Use the portal host: buildbarber.com redirects to it, which breaks POST requests.
-    public static let defaultBaseURL = URL(string: "https://portal.buildbarber.com")!
+/// Configuration for talking to the TestJuice REST API.
+public struct TestJuiceConfiguration: Sendable {
+    /// Use the portal host: testjuice.com redirects to it, which breaks POST requests.
+    public static let defaultBaseURL = URL(string: "https://portal.testjuice.com")!
 
-    /// "iOS SDK API key" generated in BuildBarber Settings.
+    /// "iOS SDK API key" generated in TestJuice Settings.
     public var apiKey: String
     public var baseURL: URL
 
-    public init(apiKey: String, baseURL: URL = BuildBarberConfiguration.defaultBaseURL) {
+    public init(apiKey: String, baseURL: URL = TestJuiceConfiguration.defaultBaseURL) {
         self.apiKey = apiKey
         self.baseURL = baseURL
     }
 }
 
-public enum BuildBarberTestType: String, Codable, Sendable {
+public enum TestJuiceTestType: String, Codable, Sendable {
     case feature = "Feature"
     case release = "Release"
 }
@@ -46,7 +46,7 @@ public struct SdkRewardInfo: Decodable, Sendable {
     }
 }
 
-public struct BuildBarberTest: Decodable, Sendable {
+public struct TestJuiceTest: Decodable, Sendable {
     public struct ChecklistItem: Decodable, Sendable {
         public let key: String
         public let label: String
@@ -60,8 +60,8 @@ public struct BuildBarberTest: Decodable, Sendable {
     public let reward: SdkRewardInfo?
 }
 
-public struct BuildBarberTestResult: Encodable, Sendable {
-    public let testType: BuildBarberTestType
+public struct TestJuiceTestResult: Encodable, Sendable {
+    public let testType: TestJuiceTestType
     public let codeword: String
     public let testerEmail: String
     public let outcome: String?
@@ -98,7 +98,7 @@ public struct APIErrorBody: Codable, Sendable, Equatable {
     public let message: String?
 }
 
-public enum BuildBarberError: Error, LocalizedError, Sendable, Equatable {
+public enum TestJuiceError: Error, LocalizedError, Sendable, Equatable {
     case invalidURL
     case api(status: Int, body: APIErrorBody)
     case badStatus(Int)
@@ -137,8 +137,8 @@ public enum BuildBarberError: Error, LocalizedError, Sendable, Equatable {
     }
 }
 
-extension BuildBarberError {
-    static func make(statusCode: Int, responseBody: Data) -> BuildBarberError {
+extension TestJuiceError {
+    static func make(statusCode: Int, responseBody: Data) -> TestJuiceError {
         if let apiError = try? JSONDecoder().decode(APIErrorBody.self, from: responseBody) {
             return .api(status: statusCode, body: apiError)
         }
@@ -149,13 +149,13 @@ extension BuildBarberError {
 }
 
 /// Minimal client for `/api/sdk/v1`. JSON is camelCase in both directions.
-public struct BuildBarberClient: Sendable {
+public struct TestJuiceClient: Sendable {
     public static let apiPath = "/api/sdk/v1"
 
-    public let configuration: BuildBarberConfiguration
+    public let configuration: TestJuiceConfiguration
     private let session: URLSession
 
-    public init(configuration: BuildBarberConfiguration, session: URLSession = .shared) {
+    public init(configuration: TestJuiceConfiguration, session: URLSession = .shared) {
         self.configuration = configuration
         self.session = session
     }
@@ -163,13 +163,13 @@ public struct BuildBarberClient: Sendable {
     func makeRequest(method: String, path: String, body: Data? = nil) throws -> URLRequest {
         let trimmed = path.hasPrefix("/") ? path : "/" + path
         guard var components = URLComponents(url: configuration.baseURL, resolvingAgainstBaseURL: false) else {
-            throw BuildBarberError.invalidURL
+            throw TestJuiceError.invalidURL
         }
         let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
         let queryStart = trimmed.firstIndex(of: "?")
         components.path = basePath + Self.apiPath + (queryStart.map { String(trimmed[..<$0]) } ?? trimmed)
         components.percentEncodedQuery = queryStart.map { String(trimmed[trimmed.index(after: $0)...]) }
-        guard let url = components.url else { throw BuildBarberError.invalidURL }
+        guard let url = components.url else { throw TestJuiceError.invalidURL }
 
         var request = URLRequest(url: url)
         request.httpMethod = method
@@ -187,7 +187,7 @@ public struct BuildBarberClient: Sendable {
         try await send(request: makeRequest(method: method, path: path, body: body))
     }
 
-    func makeResultRequest(_ result: BuildBarberTestResult) throws -> URLRequest {
+    func makeResultRequest(_ result: TestJuiceTestResult) throws -> URLRequest {
         try makeRequest(
             method: "POST",
             path: "/tests/results",
@@ -197,7 +197,7 @@ public struct BuildBarberClient: Sendable {
     func send(request: URLRequest) async throws -> Data {
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw BuildBarberError.make(statusCode: http.statusCode, responseBody: data)
+            throw TestJuiceError.make(statusCode: http.statusCode, responseBody: data)
         }
         return data
     }
@@ -219,7 +219,7 @@ public struct BuildBarberClient: Sendable {
         let reward: SdkRewardInfo?
     }
 
-    func makeDefinitionRequest(testType: BuildBarberTestType, codeword: String) throws -> URLRequest {
+    func makeDefinitionRequest(testType: TestJuiceTestType, codeword: String) throws -> URLRequest {
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: "&=+#")
         let encoded = codeword.addingPercentEncoding(withAllowedCharacters: allowed) ?? codeword
@@ -227,11 +227,11 @@ public struct BuildBarberClient: Sendable {
     }
 
     /// Whether the backend allows Pass/Fail buttons for this test (`showPassFailButtons`).
-    public func fetchShowPassFailButtons(testType: BuildBarberTestType, codeword: String) async throws -> Bool {
+    public func fetchShowPassFailButtons(testType: TestJuiceTestType, codeword: String) async throws -> Bool {
         try await fetchTestDefinition(testType: testType, codeword: codeword).showPassFailButtons
     }
 
-    func fetchTestDefinition(testType: BuildBarberTestType, codeword: String) async throws -> TestDefinitionResponse {
+    func fetchTestDefinition(testType: TestJuiceTestType, codeword: String) async throws -> TestDefinitionResponse {
         let data = try await send(request: makeDefinitionRequest(testType: testType, codeword: codeword))
         return try JSONDecoder().decode(TestDefinitionResponse.self, from: data)
     }
@@ -247,14 +247,14 @@ public struct BuildBarberClient: Sendable {
 
     func makeVideoRequestURL(testRecordId: Int) throws -> URL {
         guard let url = try makeRequest(method: "POST", path: "/tests/\(testRecordId)/video").url else {
-            throw BuildBarberError.invalidURL
+            throw TestJuiceError.invalidURL
         }
         return url
     }
 
     /// Submits the result as JSON, then attaches the recording to the created test record.
     public func submitTestResult(
-        _ result: BuildBarberTestResult,
+        _ result: TestJuiceTestResult,
         videoURL: URL? = nil,
         crashLogURL: URL? = nil,
         crashArchiveURL: URL? = nil
@@ -282,9 +282,9 @@ public struct BuildBarberClient: Sendable {
                         mimeType: crashArchiveURL == nil ? "text/plain" : "application/zip"),
                    let uploadResponse = try? JSONDecoder().decode(CrashLogUploadResponse.self, from: responseBody) {
                     if let uuids = uploadResponse.dsymUuids {
-                        NSLog("BuildBarber SDK crash upload included \(uuids.count) dSYM UUID(s).")
+                        NSLog("TestJuice SDK crash upload included \(uuids.count) dSYM UUID(s).")
                     } else {
-                        NSLog("BuildBarber SDK crash upload completed without a dSYM.")
+                        NSLog("TestJuice SDK crash upload completed without a dSYM.")
                     }
                 }
             }

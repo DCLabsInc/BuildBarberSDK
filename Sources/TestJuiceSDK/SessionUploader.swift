@@ -40,7 +40,7 @@ struct SessionUploader: Sendable {
         return data
     }
 
-    static func error(statusCode: Int, responseBody: Data) -> BuildBarberError {
-        BuildBarberError.make(statusCode: statusCode, responseBody: responseBody)
+    static func error(statusCode: Int, responseBody: Data) -> TestJuiceError {
+        TestJuiceError.make(statusCode: statusCode, responseBody: responseBody)
     }
 }

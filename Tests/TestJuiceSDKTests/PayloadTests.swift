@@ -1,6 +1,6 @@
 import Testing
 import Foundation
-@testable import BuildBarberSDK
+@testable import TestJuiceSDK
 
 #if canImport(UIKit) && canImport(ReplayKit)
 import ReplayKit
@@ -73,13 +73,13 @@ import ReplayKit
 @Suite struct SessionUploaderTests {
     @Test func uploadRequestIncludesVideoFieldAndAPIKey() throws {
         let videoURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("buildbarber-test-\(UUID().uuidString).mp4")
+            .appendingPathComponent("testjuice-test-\(UUID().uuidString).mp4")
         try Data("video-data".utf8).write(to: videoURL)
         defer { try? FileManager.default.removeItem(at: videoURL) }
 
         let uploader = SessionUploader(
             apiKey: "test-key",
-            endpoint: URL(string: "https://portal.buildbarber.com/api/sdk/v1/tests/7/video")!)
+            endpoint: URL(string: "https://portal.testjuice.com/api/sdk/v1/tests/7/video")!)
         let (request, body) = try uploader.makeUploadRequest(videoURL: videoURL)
 
         #expect(request.httpMethod == "POST")
@@ -93,13 +93,13 @@ import ReplayKit
 
     @Test func uploadRequestSupportsCrashArchiveField() throws {
         let archiveURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("buildbarber-test-\(UUID().uuidString).zip")
+            .appendingPathComponent("testjuice-test-\(UUID().uuidString).zip")
         try Data("zip-data".utf8).write(to: archiveURL)
         defer { try? FileManager.default.removeItem(at: archiveURL) }
 
         let uploader = SessionUploader(
             apiKey: "test-key",
-            endpoint: URL(string: "https://portal.buildbarber.com/api/sdk/v1/tests/7/crash-log")!)
+            endpoint: URL(string: "https://portal.testjuice.com/api/sdk/v1/tests/7/crash-log")!)
         let (request, body) = try uploader.makeUploadRequest(
             fileURL: archiveURL,
             field: "archive",
@@ -122,15 +122,15 @@ import ReplayKit
 
 @Suite struct ClientTests {
     @Test func requestUsesPortalHostPathAndApiKey() throws {
-        let client = BuildBarberClient(configuration: .init(apiKey: "k123"))
+        let client = TestJuiceClient(configuration: .init(apiKey: "k123"))
         let req = try client.makeRequest(method: "GET", path: "/tests?limit=5")
-        #expect(req.url?.absoluteString == "https://portal.buildbarber.com/api/sdk/v1/tests?limit=5")
+        #expect(req.url?.absoluteString == "https://portal.testjuice.com/api/sdk/v1/tests?limit=5")
         #expect(req.value(forHTTPHeaderField: "X-Api-Key") == "k123")
     }
 
     @Test func resultWithoutVideoUsesJSONRequest() throws {
-        let client = BuildBarberClient(configuration: .init(apiKey: "k123"))
-        let result = BuildBarberTestResult(
+        let client = TestJuiceClient(configuration: .init(apiKey: "k123"))
+        let result = TestJuiceTestResult(
             testType: .feature,
             codeword: "code",
             testerEmail: "tester@example.com",
@@ -141,24 +141,24 @@ import ReplayKit
         let request = try client.makeResultRequest(result)
 
         #expect(request.httpMethod == "POST")
-        #expect(request.url?.absoluteString == "https://portal.buildbarber.com/api/sdk/v1/tests/results")
+        #expect(request.url?.absoluteString == "https://portal.testjuice.com/api/sdk/v1/tests/results")
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
         #expect(request.value(forHTTPHeaderField: "X-Api-Key") == "k123")
         #expect(request.httpBody?.range(of: Data(#""feedback":"Feedback""#.utf8)) != nil)
     }
 
     @Test func videoEndpointUsesTestRecordId() throws {
-        let client = BuildBarberClient(configuration: .init(apiKey: "k123"))
+        let client = TestJuiceClient(configuration: .init(apiKey: "k123"))
         #expect(try client.makeVideoRequestURL(testRecordId: 42).absoluteString
-            == "https://portal.buildbarber.com/api/sdk/v1/tests/42/video")
+            == "https://portal.testjuice.com/api/sdk/v1/tests/42/video")
         let response = try JSONDecoder().decode(
-            BuildBarberClient.TestResultResponse.self,
+            TestJuiceClient.TestResultResponse.self,
             from: Data(#"{"testRecordId":42,"status":"passed"}"#.utf8))
         #expect(response.testRecordId == 42)
     }
 
     @Test func feedbackOnlyResultOmitsOutcome() throws {
-        let result = BuildBarberTestResult(
+        let result = TestJuiceTestResult(
             testType: .release,
             codeword: "code",
             testerEmail: "tester@example.com",
@@ -172,7 +172,7 @@ import ReplayKit
     }
 
     @Test func emptyTesterEmailUsesAnonymousAddress() throws {
-        let result = BuildBarberTestResult(
+        let result = TestJuiceTestResult(
             testType: .feature,
             codeword: "code",
             testerEmail: "  \n",
@@ -189,11 +189,11 @@ import ReplayKit
     }
 
     @Test func requestErrorsExposeActionableMessages() {
-        #expect(BuildBarberError.api(
+        #expect(TestJuiceError.api(
             status: 400,
             body: APIErrorBody(error: "invalid_result", message: "Missing codeword.")
         ).localizedDescription == "Missing codeword.")
-        #expect(BuildBarberError.badStatus(500).localizedDescription == "The request failed (HTTP 500).")
+        #expect(TestJuiceError.badStatus(500).localizedDescription == "The request failed (HTTP 500).")
     }
 }
 
@@ -213,7 +213,7 @@ import ReplayKit
 
 @Suite struct TestDefinitionTests {
     @Test func definitionRequestTargetsTestsEndpoint() throws {
-        let client = BuildBarberClient(configuration: BuildBarberConfiguration(apiKey: "k"))
+        let client = TestJuiceClient(configuration: TestJuiceConfiguration(apiKey: "k"))
         let request = try client.makeDefinitionRequest(testType: .release, codeword: "a b&c")
         let url = try #require(request.url?.absoluteString)
         #expect(url.hasSuffix("/api/sdk/v1/tests?testType=Release&codeword=a%20b%26c"))
@@ -222,13 +222,13 @@ import ReplayKit
 
     @Test func decodesShowPassFailFlag() throws {
         let json = #"{"testType":"Feature","codeword":"x","showPassFailButtons":false,"checklist":[]}"#
-        let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
+        let decoded = try JSONDecoder().decode(TestJuiceClient.TestDefinitionResponse.self, from: Data(json.utf8))
         #expect(decoded.showPassFailButtons == false)
     }
 
     @Test func decodesRewardFromDefinition() throws {
         let json = #"{"showPassFailButtons":true,"reward":{"description":"Free coffee","groupTitle":"Perks"}}"#
-        let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
+        let decoded = try JSONDecoder().decode(TestJuiceClient.TestDefinitionResponse.self, from: Data(json.utf8))
         #expect(decoded.reward?.description == "Free coffee")
         #expect(decoded.reward?.groupTitle == "Perks")
     }
@@ -238,13 +238,13 @@ import ReplayKit
         #"{"showPassFailButtons":false,"reward":null}"#
     ])
     func missingOrNullRewardIsAccepted(json: String) throws {
-        let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
+        let decoded = try JSONDecoder().decode(TestJuiceClient.TestDefinitionResponse.self, from: Data(json.utf8))
         #expect(decoded.reward == nil)
     }
 
     @Test func decodesRewardAvailability() throws {
         let json = #"{"showPassFailButtons":true,"reward":{"description":"Coffee","availableCodes":0,"availabilityStatus":"No codes left","totalCodes":5}}"#
-        let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
+        let decoded = try JSONDecoder().decode(TestJuiceClient.TestDefinitionResponse.self, from: Data(json.utf8))
         #expect(decoded.reward?.availableCodes == 0)
         #expect(decoded.reward?.availabilityStatus == "No codes left")
         #expect(decoded.reward?.totalCodes == 5)
@@ -253,7 +253,7 @@ import ReplayKit
 
     @Test func testModelDecodesReward() throws {
         let json = #"{"title":"Test","instructions":"Try it.","checklist":[],"showPassFailButtons":false,"reward":{"description":null,"groupTitle":"Prize"}}"#
-        let decoded = try JSONDecoder().decode(BuildBarberTest.self, from: Data(json.utf8))
+        let decoded = try JSONDecoder().decode(TestJuiceTest.self, from: Data(json.utf8))
         #expect(decoded.reward?.description == "Prize")
         #expect(decoded.reward?.groupTitle == "Prize")
     }

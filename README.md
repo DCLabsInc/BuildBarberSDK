@@ -1,7 +1,7 @@
-# BuildBarber SDK
+# TestJuice SDK
 
-BuildBarberSDK lets an iOS app collect a screen recording, checklist status, and
-user feedback for a test session so it will all appear in the BuildBarber portal.
+TestJuiceSDK lets an iOS app collect a screen recording, checklist status, and
+user feedback for a test session so it will all appear in the TestJuice portal.
 
 ## Requirements
 
@@ -13,10 +13,10 @@ user feedback for a test session so it will all appear in the BuildBarber portal
 In Xcode, choose **File > Add Package Dependencies…** and enter:
 
 ```text
-https://github.com/DCLabsInc/BuildBarberSDK
+https://github.com/DCLabsInc/TestJuiceSDK
 ```
 
-Select the `BuildBarberSDK` library for your app target.
+Select the `TestJuiceSDK` library for your app target.
 
 > [!IMPORTANT]
 > **Sign in with Apple is required.** Enable the **Sign in with Apple**
@@ -48,24 +48,24 @@ Other Info.plist privacy keys depend on which features you enable:
 
 Configure the shared session manager before offering the session flow to users.
 Use an API key appropriate for a client app (never embed a privileged server
-secret), and provide the test type and codeword supplied by BuildBarber,
+secret), and provide the test type and codeword supplied by TestJuice,
 along with the checklist items to show testers.
 The test type is `.feature` or `.release`.
 
 ```swift
-import BuildBarberSDK
+import TestJuiceSDK
 import UIKit
 
 final class FeedbackViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        guard let apiKey = BuildBarberAppConfiguration.apiKey() else {
+        guard let apiKey = TestJuiceAppConfiguration.apiKey() else {
             assertionFailure("Missing SDKAPIKey in Info.plist; see Config.template.xcconfig")
             return
         }
 
-        BuildBarberSessionManager.shared.configure(
+        TestJuiceSessionManager.shared.configure(
             apiKey: apiKey,
             testType: .feature,
             codeword: "YOUR_CODEWORD",
@@ -76,7 +76,7 @@ final class FeedbackViewController: UIViewController {
             ]
         )
 
-        BuildBarberSessionManager.shared.startSession(presentingFrom: self)
+        TestJuiceSessionManager.shared.startSession(presentingFrom: self)
     }
 }
 ```
@@ -87,7 +87,7 @@ are present, it uploads them with `crash.log` in one ZIP; otherwise it uploads
 the plain crash log. Configure `dsymAppGroupIdentifier` when your app places
 symbols in an App Group. Installed apps cannot access Xcode DerivedData.
 SwiftPM compiles this SDK into the host app, so its code is normally covered by
-the app executable's dSYM rather than a separate `BuildBarberSDK.dSYM`. A dSYM
+the app executable's dSYM rather than a separate `TestJuiceSDK.dSYM`. A dSYM
 is not normally shipped inside an installed app; the host app must explicitly
 make any dSYM available in one of the searched locations at runtime.
 
@@ -109,8 +109,8 @@ session menu.
 ## Checklist items
 
 Checklist items are provided statically through the `checklistItems` argument of
-`BuildBarberSessionManager.shared.configure(...)`. They are **not** pulled
-dynamically from the BuildBarber API. Each item is shown to the tester as a tick
+`TestJuiceSessionManager.shared.configure(...)`. They are **not** pulled
+dynamically from the TestJuice API. Each item is shown to the tester as a tick
 box, and the item text is submitted as the checked item identifier.
 
 To tick an item automatically when the corresponding action completes in your
@@ -121,7 +121,7 @@ to `configure`:
 ```swift
 // checklistItems: ["Sign in", "Add a dog walk", "Review walk history"]
 func didAddDogWalk() {
-    BuildBarberSessionManager.shared.tickChecklistItem(at: 1)
+    TestJuiceSessionManager.shared.tickChecklistItem(at: 1)
 }
 ```
 
@@ -154,14 +154,14 @@ is enabled for the host app's target and its App ID.
 
 On submit, the SDK will post results to:
 
-- `POST https://portal.buildbarber.com/api/sdk/v1/tests/results`
+- `POST https://portal.testjuice.com/api/sdk/v1/tests/results`
 
 Payload (JSON) includes test type, codeword, tester email, optional outcome,
 optional feedback, and checked checklist keys. The response contains a
 `testRecordId`. The session recording, when available, is then uploaded as
 `multipart/form-data` in a field named `video` to:
 
-- `POST https://portal.buildbarber.com/api/sdk/v1/tests/{testRecordId}/video`
+- `POST https://portal.testjuice.com/api/sdk/v1/tests/{testRecordId}/video`
 
 If submission or the video upload fails, the SDK shows an alert with the full
 error text and a **Copy to clipboard** button. Note that a failed video upload

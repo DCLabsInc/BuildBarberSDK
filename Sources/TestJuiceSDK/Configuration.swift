@@ -2,7 +2,7 @@ import Foundation
 
 /// Reads the SDK API key from the host app's Info.plist, where it is injected
 /// from a git-ignored `Config.xcconfig` via `SDKAPIKey = $(SDK_API_KEY)`.
-public enum BuildBarberAppConfiguration {
+public enum TestJuiceAppConfiguration {
     public static let apiKeyInfoPlistKey = "SDKAPIKey"
 
     /// Returns the API key, or `nil` if it is missing, empty, or an unresolved

@@ -2,21 +2,21 @@
 import PackageDescription
 
 let package = Package(
-    name: "BuildBarberSDK",
+    name: "TestJuiceSDK",
     platforms: [.iOS("18.0")],
     products: [
-        .library(name: "BuildBarberSDK", targets: ["BuildBarberSDK"])
+        .library(name: "TestJuiceSDK", targets: ["TestJuiceSDK"])
     ],
     dependencies: [
         .package(url: "https://github.com/ZipArchive/ZipArchive.git", from: "2.5.0")
     ],
     targets: [
         .target(
-            name: "BuildBarberSDK",
+            name: "TestJuiceSDK",
             dependencies: [
                 .product(name: "ZipArchive", package: "ZipArchive")
             ],
             resources: [.process("Resources")]),
-        .testTarget(name: "BuildBarberSDKTests", dependencies: ["BuildBarberSDK"])
+        .testTarget(name: "TestJuiceSDKTests", dependencies: ["TestJuiceSDK"])
     ]
 )
