@@ -26,14 +26,22 @@ public enum BuildBarberTestType: String, Codable, Sendable {
 public struct SdkRewardInfo: Decodable, Sendable {
     public let description: String
     public let groupTitle: String?
+    public let availableCodes: Int?
+    public let availabilityStatus: String?
+    public let totalCodes: Int?
 
-    private enum CodingKeys: String, CodingKey { case description, groupTitle }
+    public var hasNoCodesLeft: Bool { availableCodes == 0 }
+
+    private enum CodingKeys: String, CodingKey { case description, groupTitle, availableCodes, availabilityStatus, totalCodes }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let desc = try c.decodeIfPresent(String.self, forKey: .description)
         let group = try c.decodeIfPresent(String.self, forKey: .groupTitle)
         groupTitle = group
+        availableCodes = try c.decodeIfPresent(Int.self, forKey: .availableCodes)
+        availabilityStatus = try c.decodeIfPresent(String.self, forKey: .availabilityStatus)
+        totalCodes = try c.decodeIfPresent(Int.self, forKey: .totalCodes)
         description = (desc?.isEmpty == false ? desc : nil) ?? group ?? ""
     }
 }

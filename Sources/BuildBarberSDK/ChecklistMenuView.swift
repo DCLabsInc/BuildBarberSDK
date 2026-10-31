@@ -24,6 +24,11 @@ private struct RewardBanner: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                    if let status = reward.availabilityStatus, !status.isEmpty {
+                        Text(status)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(reward.hasNoCodesLeft ? .red : .secondary)
+                    }
                 }
             }
             Text(signedIn ? "Signed in. Reward pending." : "Sign in for reward")
@@ -195,6 +200,7 @@ struct ChecklistMenuView: View {
                         }
                     }
                     .signInWithAppleButtonStyle(.black)
+                    .disabled(test.reward?.hasNoCodesLeft == true)
                     .frame(height: 44)
                     .padding(.horizontal)
                 }
