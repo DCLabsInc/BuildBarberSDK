@@ -14,7 +14,7 @@ let package = Package(
         .target(
             name: "BuildBarberSDK",
             dependencies: [
-                .product(name: "ZipArchive", package: "ZipArchive", condition: .when(platforms: [.iOS]))
+                .product(name: "ZipArchive", package: "ZipArchive")
             ],
             resources: [.process("Resources")]),
         .testTarget(name: "BuildBarberSDKTests", dependencies: ["BuildBarberSDK"])
