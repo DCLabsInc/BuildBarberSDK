@@ -17,7 +17,7 @@ enum RecorderError: Error, LocalizedError, Sendable {
 
 /// Writes captured sample buffers to a file. All mutation happens on `queue`.
 final class SampleWriter: @unchecked Sendable {
-    let queue = DispatchQueue(label: "com.buildbarber.sdk.writer")
+    let queue = DispatchQueue(label: "com.testjuice.sdk.writer")
     let url: URL
     private var writer: AVAssetWriter?
     private var video: AVAssetWriterInput?

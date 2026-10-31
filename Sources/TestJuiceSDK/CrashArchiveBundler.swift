@@ -12,9 +12,9 @@ enum CrashArchiveBundler {
 
         let fileManager = FileManager.default
         let stagingDirectory = fileManager.temporaryDirectory
-            .appendingPathComponent("BuildBarberCrash-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("TestJuiceCrash-\(UUID().uuidString)", isDirectory: true)
         let archiveURL = fileManager.temporaryDirectory
-            .appendingPathComponent("BuildBarberCrash-\(UUID().uuidString).zip")
+            .appendingPathComponent("TestJuiceCrash-\(UUID().uuidString).zip")
         try fileManager.createDirectory(at: stagingDirectory, withIntermediateDirectories: true)
         defer { try? fileManager.removeItem(at: stagingDirectory) }
 

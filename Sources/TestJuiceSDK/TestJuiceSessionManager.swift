@@ -20,8 +20,8 @@ enum RecordingStartFailureMessage {
 
 /// Entry point of the SDK.
 @MainActor
-public final class BuildBarberSessionManager: ObservableObject {
-    public static let shared = BuildBarberSessionManager()
+public final class TestJuiceSessionManager: ObservableObject {
+    public static let shared = TestJuiceSessionManager()
 
     /// Shows an orange dot under each touch in the recorded video.
     public var showsTouchIndicator = true
@@ -29,15 +29,15 @@ public final class BuildBarberSessionManager: ObservableObject {
     public var tapDelay: TimeInterval = 0.2
 
     private struct Configuration {
-        let client: BuildBarberClient
-        let testType: BuildBarberTestType
+        let client: TestJuiceClient
+        let testType: TestJuiceTestType
         let codeword: String
         let checklistItems: [String]
         let dsymAppGroupIdentifier: String?
     }
 
     private var configuration: Configuration?
-    private var currentTest: BuildBarberTest?
+    private var currentTest: TestJuiceTest?
     @Published private var checkedItems = Set<String>()
     private let recorder = ScreenRecorder()
     private var overlay: FloatingOverlay?
@@ -58,13 +58,13 @@ public final class BuildBarberSessionManager: ObservableObject {
 
     public func configure(
         apiKey: String,
-        testType: BuildBarberTestType,
+        testType: TestJuiceTestType,
         codeword: String,
         checklistItems: [String],
         dsymAppGroupIdentifier: String? = nil
     ) {
         configuration = Configuration(
-            client: BuildBarberClient(configuration: BuildBarberConfiguration(apiKey: apiKey)),
+            client: TestJuiceClient(configuration: TestJuiceConfiguration(apiKey: apiKey)),
             testType: testType,
             codeword: codeword,
             checklistItems: checklistItems,
@@ -156,11 +156,11 @@ public final class BuildBarberSessionManager: ObservableObject {
             testType: configuration.testType, codeword: configuration.codeword)
         guard !isActive else { return }
         checkedItems.removeAll()
-        currentTest = BuildBarberTest(
+        currentTest = TestJuiceTest(
             title: "Test session",
             instructions: "The app crashed. Your recording and crash log will be sent when you submit.",
             checklist: configuration.checklistItems.map {
-                BuildBarberTest.ChecklistItem(key: $0, label: $0, kind: "task")
+                TestJuiceTest.ChecklistItem(key: $0, label: $0, kind: "task")
             },
             showPassFailButtons: definition?.showPassFailButtons ?? false,
             reward: definition?.reward)
@@ -233,11 +233,11 @@ public final class BuildBarberSessionManager: ObservableObject {
             let definition = try? await configuration.client.fetchTestDefinition(
                 testType: configuration.testType, codeword: configuration.codeword)
             guard !self.isActive else { return }
-            self.currentTest = BuildBarberTest(
+            self.currentTest = TestJuiceTest(
                 title: "Test session",
                 instructions: "Tick each item as you complete it, then submit your result.",
                 checklist: configuration.checklistItems.map {
-                    BuildBarberTest.ChecklistItem(key: $0, label: $0, kind: "task")
+                    TestJuiceTest.ChecklistItem(key: $0, label: $0, kind: "task")
                 },
                 showPassFailButtons: definition?.showPassFailButtons ?? false,
                 reward: definition?.reward)
@@ -257,7 +257,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         let info = Bundle.main.infoDictionary
         let version = info?["CFBundleShortVersionString"] as? String ?? ""
         let build = info?["CFBundleVersion"] as? String ?? ""
-        return "com.buildbarber.sdk.completed.\(configuration.testType.rawValue).\(configuration.codeword)"
+        return "com.testjuice.sdk.completed.\(configuration.testType.rawValue).\(configuration.codeword)"
             + ".\(version).\(build)"
     }
 
@@ -392,7 +392,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         guard let test = currentTest else { return }
         let view = ChecklistMenuView(test: test, sessionManager: self, initialFeedback: initialFeedback) { [weak self] outcome, email, feedback, checkedItems in
             guard let self, let configuration = self.configuration else { return }
-            let result = BuildBarberTestResult(
+            let result = TestJuiceTestResult(
                 testType: configuration.testType,
                 codeword: configuration.codeword,
                 testerEmail: email,
@@ -440,7 +440,7 @@ public final class BuildBarberSessionManager: ObservableObject {
         if !awaitingFeedback {
             awaitingFeedback = true
             TouchIndicator.shared.stop()
-            let taskID = UIApplication.shared.beginBackgroundTask(withName: "BuildBarber.finalize")
+            let taskID = UIApplication.shared.beginBackgroundTask(withName: "TestJuice.finalize")
             pendingVideoURL = await recorder.stop()
             if taskID != .invalid { UIApplication.shared.endBackgroundTask(taskID) }
         }
@@ -449,19 +449,19 @@ public final class BuildBarberSessionManager: ObservableObject {
         content.title = "Feedback needed"
         content.body = "Tap here to return to the app and submit your test feedback."
         content.sound = .default
-        let request = UNNotificationRequest(identifier: "com.buildbarber.sdk.paused", content: content, trigger: nil)
+        let request = UNNotificationRequest(identifier: "com.testjuice.sdk.paused", content: content, trigger: nil)
         try? await UNUserNotificationCenter.current().add(request)
     }
 
     private func handleForeground() {
         guard isActive, awaitingFeedback else { return }
-        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["com.buildbarber.sdk.paused"])
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ["com.testjuice.sdk.paused"])
         presentMenu()
     }
 
     // MARK: Completion
 
-    private func submit(_ result: BuildBarberTestResult) async throws {
+    private func submit(_ result: TestJuiceTestResult) async throws {
         guard isActive, let configuration else { return }
         if !awaitingFeedback && pendingVideoURL == nil {
             pendingVideoURL = await recorder.stop()
@@ -476,7 +476,7 @@ public final class BuildBarberSessionManager: ObservableObject {
                     crashLogURL: crashLogURL,
                     appGroupIdentifier: configuration.dsymAppGroupIdentifier)
             } catch {
-                NSLog("BuildBarber SDK could not bundle the crash dSYM: %@", error.localizedDescription)
+                NSLog("TestJuice SDK could not bundle the crash dSYM: %@", error.localizedDescription)
                 crashArchiveURL = nil
             }
         } else {

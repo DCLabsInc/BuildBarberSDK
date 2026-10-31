@@ -107,10 +107,10 @@ struct SessionConfirmationView: View {
 }
 
 struct ChecklistMenuView: View {
-    private static let appleEmailDefaultsKey = "com.buildbarber.sdk.testerEmail"
+    private static let appleEmailDefaultsKey = "com.testjuice.sdk.testerEmail"
 
-    let test: BuildBarberTest
-    @ObservedObject var sessionManager: BuildBarberSessionManager
+    let test: TestJuiceTest
+    @ObservedObject var sessionManager: TestJuiceSessionManager
     var initialFeedback = ""
     let onSubmit: (String?, String, String, [String]) async throws -> Void
 
@@ -126,8 +126,8 @@ struct ChecklistMenuView: View {
     @FocusState private var feedbackIsFocused: Bool
 
     init(
-        test: BuildBarberTest,
-        sessionManager: BuildBarberSessionManager,
+        test: TestJuiceTest,
+        sessionManager: TestJuiceSessionManager,
         initialFeedback: String = "",
         onSubmit: @escaping (String?, String, String, [String]) async throws -> Void
     ) {
@@ -322,7 +322,7 @@ struct ChecklistMenuView: View {
                     test.checklist.filter { sessionManager.checkedChecklistItemKeys.contains($0.key) }.map(\.key))
             } catch {
                 submissionError = error.localizedDescription
-                errorDetails = (error as? BuildBarberError)?.detailedDescription ?? String(describing: error)
+                errorDetails = (error as? TestJuiceError)?.detailedDescription ?? String(describing: error)
                 showingErrorDetails = true
                 isSubmitting = false
             }
