@@ -1,6 +1,7 @@
 #if canImport(UIKit) && canImport(ReplayKit)
 import Combine
 import Photos
+import ReplayKit
 import SwiftUI
 import UIKit
 import UserNotifications
