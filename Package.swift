@@ -4,11 +4,11 @@ import PackageDescription
 let package = Package(
     name: "BuildBarberSDK",
     platforms: [.iOS("18.0")],
-    dependencies: [
-        .package(url: "https://github.com/ZipArchive/ZipArchive.git", from: "2.5.0")
-    ],
     products: [
         .library(name: "BuildBarberSDK", targets: ["BuildBarberSDK"])
+    ],
+    dependencies: [
+        .package(url: "https://github.com/ZipArchive/ZipArchive.git", from: "2.5.0")
     ],
     targets: [
         .target(
