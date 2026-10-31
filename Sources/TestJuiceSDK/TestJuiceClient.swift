@@ -80,6 +80,14 @@ public struct TestJuiceTestResult: Encodable, Sendable {
         try container.encodeIfPresent(outcome, forKey: .outcome)
         try container.encode(feedback, forKey: .feedback)
         try container.encode(checkedItems, forKey: .checkedItems)
+        try container.encodeIfPresent(telemetry?.deviceModel, forKey: .deviceModel)
+        try container.encodeIfPresent(telemetry?.osVersion, forKey: .osVersion)
+        try container.encodeIfPresent(telemetry?.networkType, forKey: .networkType)
+        try container.encodeIfPresent(telemetry?.batteryLevel, forKey: .batteryLevel)
+        try container.encodeIfPresent(telemetry?.appVersion, forKey: .appVersion)
+        try container.encodeIfPresent(telemetry?.localeLanguage, forKey: .localeLanguage)
+        try container.encodeIfPresent(telemetry?.deviceMemoryMb, forKey: .deviceMemoryMb)
+        try container.encodeIfPresent(telemetry?.screenSize, forKey: .screenSize)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -89,7 +97,17 @@ public struct TestJuiceTestResult: Encodable, Sendable {
         case outcome
         case feedback
         case checkedItems
+        case deviceModel
+        case osVersion
+        case networkType
+        case batteryLevel
+        case appVersion
+        case localeLanguage
+        case deviceMemoryMb
+        case screenSize
     }
+
+    var telemetry: TestJuiceDeviceTelemetry? = nil
 }
 
 /// Error body returned by the API: `{ "error": "<code>", "message": "<text>" }`.
@@ -187,11 +205,14 @@ public struct TestJuiceClient: Sendable {
         try await send(request: makeRequest(method: method, path: path, body: body))
     }
 
-    func makeResultRequest(_ result: TestJuiceTestResult) throws -> URLRequest {
+    func makeResultRequest(
+        _ result: TestJuiceTestResult,
+        telemetry: TestJuiceDeviceTelemetry? = nil
+    ) throws -> URLRequest {
         try makeRequest(
             method: "POST",
             path: "/tests/results",
-            body: JSONEncoder().encode(result))
+            body: JSONEncoder().encode(result.withTelemetry(telemetry)))
     }
 
     func send(request: URLRequest) async throws -> Data {
@@ -251,10 +272,11 @@ public struct TestJuiceClient: Sendable {
     /// Submits the result as JSON, then attaches the recording to the created test record.
     public func submitTestResult(
         _ result: TestJuiceTestResult,
+        telemetry: TestJuiceDeviceTelemetry? = nil,
         videoURL: URL? = nil,
         crashLogURL: URL? = nil
     ) async throws {
-        let data = try await send(request: makeResultRequest(result))
+        let data = try await send(request: makeResultRequest(result, telemetry: telemetry))
         guard videoURL != nil || crashLogURL != nil else { return }
 
         let response = try JSONDecoder().decode(TestResultResponse.self, from: data)
@@ -271,5 +293,13 @@ public struct TestJuiceClient: Sendable {
                     .upload(fileURL: crashLogURL, field: "crashLog", mimeType: "text/plain")
             }
         }
+    }
+}
+
+private extension TestJuiceTestResult {
+    func withTelemetry(_ telemetry: TestJuiceDeviceTelemetry?) -> Self {
+        var result = self
+        result.telemetry = telemetry
+        return result
     }
 }
