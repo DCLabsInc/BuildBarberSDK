@@ -91,27 +91,6 @@ import ReplayKit
         #expect(body.range(of: Data("video-data".utf8)) != nil)
     }
 
-    @Test func uploadRequestSupportsCrashArchiveField() throws {
-        let archiveURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("testjuice-test-\(UUID().uuidString).zip")
-        try Data("zip-data".utf8).write(to: archiveURL)
-        defer { try? FileManager.default.removeItem(at: archiveURL) }
-
-        let uploader = SessionUploader(
-            apiKey: "test-key",
-            endpoint: URL(string: "https://portal.testjuice.com/api/sdk/v1/tests/7/crash-log")!)
-        let (request, body) = try uploader.makeUploadRequest(
-            fileURL: archiveURL,
-            field: "archive",
-            mimeType: "application/zip")
-
-        #expect(request.httpMethod == "POST")
-        #expect(request.value(forHTTPHeaderField: "Content-Type")?.contains("multipart/form-data") == true)
-        #expect(body.range(of: Data("name=\"archive\"; filename=\"\(archiveURL.lastPathComponent)\"".utf8)) != nil)
-        #expect(body.range(of: Data("application/zip".utf8)) != nil)
-        #expect(body.range(of: Data("zip-data".utf8)) != nil)
-    }
-
     @Test func uploadErrorsIncludeAPIResponseMessage() {
         let error = SessionUploader.error(
             statusCode: 400,

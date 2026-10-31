@@ -241,10 +241,6 @@ public struct TestJuiceClient: Sendable {
         let status: String
     }
 
-    private struct CrashLogUploadResponse: Decodable {
-        let dsymUuids: [String]?
-    }
-
     func makeVideoRequestURL(testRecordId: Int) throws -> URL {
         guard let url = try makeRequest(method: "POST", path: "/tests/\(testRecordId)/video").url else {
             throw TestJuiceError.invalidURL
@@ -256,11 +252,10 @@ public struct TestJuiceClient: Sendable {
     public func submitTestResult(
         _ result: TestJuiceTestResult,
         videoURL: URL? = nil,
-        crashLogURL: URL? = nil,
-        crashArchiveURL: URL? = nil
+        crashLogURL: URL? = nil
     ) async throws {
         let data = try await send(request: makeResultRequest(result))
-        guard videoURL != nil || crashLogURL != nil || crashArchiveURL != nil else { return }
+        guard videoURL != nil || crashLogURL != nil else { return }
 
         let response = try JSONDecoder().decode(TestResultResponse.self, from: data)
         if let videoURL {
@@ -268,25 +263,12 @@ public struct TestJuiceClient: Sendable {
             try await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
                 .upload(videoURL: videoURL)
         }
-        if let fileURL = crashArchiveURL ?? crashLogURL {
+        if let crashLogURL {
             // Best effort: the result itself has already been recorded.
             if let endpoint = try? makeRequest(
                 method: "POST", path: "/tests/\(response.testRecordId)/crash-log").url {
-                if let responseBody = try? await SessionUploader(
-                    apiKey: configuration.apiKey,
-                    endpoint: endpoint,
-                    session: session)
-                    .upload(
-                        fileURL: fileURL,
-                        field: crashArchiveURL == nil ? "crashLog" : "archive",
-                        mimeType: crashArchiveURL == nil ? "text/plain" : "application/zip"),
-                   let uploadResponse = try? JSONDecoder().decode(CrashLogUploadResponse.self, from: responseBody) {
-                    if let uuids = uploadResponse.dsymUuids {
-                        NSLog("TestJuice SDK crash upload included \(uuids.count) dSYM UUID(s).")
-                    } else {
-                        NSLog("TestJuice SDK crash upload completed without a dSYM.")
-                    }
-                }
+                try? await SessionUploader(apiKey: configuration.apiKey, endpoint: endpoint, session: session)
+                    .upload(fileURL: crashLogURL, field: "crashLog", mimeType: "text/plain")
             }
         }
     }
