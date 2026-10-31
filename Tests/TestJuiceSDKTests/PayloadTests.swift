@@ -124,6 +124,39 @@ import ReplayKit
         #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
         #expect(request.value(forHTTPHeaderField: "X-Api-Key") == "k123")
         #expect(request.httpBody?.range(of: Data(#""feedback":"Feedback""#.utf8)) != nil)
+        #expect(request.httpBody?.range(of: Data(#""deviceModel""#.utf8)) == nil)
+    }
+
+    @Test func resultRequestEncodesOptionalTelemetryAtTopLevel() throws {
+        let client = TestJuiceClient(configuration: .init(apiKey: "k123"))
+        let result = TestJuiceTestResult(
+            testType: .feature,
+            codeword: "code",
+            testerEmail: "tester@example.com",
+            outcome: "Pass",
+            feedback: "Feedback",
+            checkedItems: [])
+        let telemetry = TestJuiceDeviceTelemetry(
+            deviceModel: "iPhone",
+            osVersion: "18.0",
+            networkType: "WiFi",
+            batteryLevel: 83,
+            appVersion: "2.0.0",
+            localeLanguage: "en",
+            deviceMemoryMb: 8192,
+            screenSize: "852 pt")
+
+        let request = try client.makeResultRequest(result, telemetry: telemetry)
+        let json = try #require(JSONSerialization.jsonObject(with: request.httpBody!) as? [String: Any])
+
+        #expect(json["deviceModel"] as? String == "iPhone")
+        #expect(json["osVersion"] as? String == "18.0")
+        #expect(json["networkType"] as? String == "WiFi")
+        #expect(json["batteryLevel"] as? Int == 83)
+        #expect(json["appVersion"] as? String == "2.0.0")
+        #expect(json["localeLanguage"] as? String == "en")
+        #expect(json["deviceMemoryMb"] as? Int == 8192)
+        #expect(json["screenSize"] as? String == "852 pt")
     }
 
     @Test func videoEndpointUsesTestRecordId() throws {

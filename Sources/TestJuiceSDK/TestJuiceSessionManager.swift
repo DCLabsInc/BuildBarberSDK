@@ -466,8 +466,10 @@ public final class TestJuiceSessionManager: ObservableObject {
         let videoSize = pendingVideoURL.map(RecordingLimits.fileSize(at:)) ?? 0
         let tooLarge = RecordingLimits.exceedsUploadLimit(fileSize: videoSize)
         let recovery = crashRecovery
+        let telemetry = await TestJuiceDeviceTelemetry.collect()
         try await configuration.client.submitTestResult(
             result,
+            telemetry: telemetry,
             videoURL: tooLarge ? nil : pendingVideoURL,
             crashLogURL: recovery?.crashLogURL)
         markTestCompleted(configuration)
