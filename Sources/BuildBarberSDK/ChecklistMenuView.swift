@@ -85,15 +85,15 @@ struct SessionConfirmationView: View {
                     .frame(maxWidth: .infinity, alignment: .trailing)
 
                 HStack {
-                    Button("Don't record") { choose(record: false) }
-                        .buttonStyle(.bordered)
-                        .tint(.black)
-                        .foregroundStyle(.white)
-                    Spacer()
                     Button("Record session") { choose(record: true) }
                         .buttonStyle(.borderedProminent)
                         .tint(.orange)
                         .foregroundStyle(.black)
+                    Spacer()
+                    Button("Don't record") { choose(record: false) }
+                        .buttonStyle(.bordered)
+                        .tint(.black)
+                        .foregroundStyle(.white)
                 }
             }
             .padding(24)

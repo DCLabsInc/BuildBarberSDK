@@ -2,6 +2,33 @@ import Testing
 import Foundation
 @testable import BuildBarberSDK
 
+#if canImport(UIKit) && canImport(ReplayKit)
+import ReplayKit
+
+@Suite struct RecordingStartFailureMessageTests {
+    @Test func userDecliningRecordingShowsConciseMessage() {
+        let error = NSError(
+            domain: RPRecordingErrorDomain,
+            code: RPRecordingErrorCode.userDeclined.rawValue)
+
+        #expect(RecordingStartFailureMessage.message(for: error)
+            == "You chose not to record the session. You can still submit feedback but may miss out on any associated rewards")
+    }
+
+    @Test func otherRecordingFailuresKeepDiagnosticDetails() {
+        let error = NSError(
+            domain: RPRecordingErrorDomain,
+            code: 0,
+            userInfo: [NSLocalizedDescriptionKey: "Recorder unavailable"])
+
+        let message = RecordingStartFailureMessage.message(for: error)
+
+        #expect(message.hasPrefix("Recorder unavailable\n\n"))
+        #expect(message.contains("You can still submit your feedback without a video."))
+    }
+}
+#endif
+
 @Suite struct AppleSignInEmailTests {
     @Test func credentialEmailTakesPrecedence() {
         #expect(AppleSignInEmail.resolve(credentialEmail: "tester@example.com", identityToken: nil)
