@@ -5,6 +5,18 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
+enum RecordingStartFailureMessage {
+    static func message(for error: Error) -> String {
+        let recorderError = error as NSError
+        if recorderError.domain == RPRecordingErrorDomain,
+           recorderError.code == RPRecordingErrorCode.userDeclined.rawValue {
+            return "You chose not to record the session. You can still submit feedback but may miss out on any associated rewards"
+        }
+
+        return "\(error.localizedDescription)\n\n(\(String(reflecting: error)))\n\nYou can still submit your feedback without a video."
+    }
+}
+
 /// Entry point of the SDK.
 @MainActor
 public final class BuildBarberSessionManager: ObservableObject {
@@ -283,7 +295,7 @@ public final class BuildBarberSessionManager: ObservableObject {
                 recording = false
                 let alert = UIAlertController(
                     title: "Couldn't start recording",
-                    message: "\(error.localizedDescription)\n\n(\(String(reflecting: error)))\n\nYou can still submit your feedback without a video.",
+                    message: RecordingStartFailureMessage.message(for: error),
                     preferredStyle: .alert)
                 Self.stylePopup(alert)
                 alert.addAction(UIAlertAction(title: "OK", style: .default))
