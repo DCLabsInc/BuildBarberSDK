@@ -215,6 +215,15 @@ import Foundation
         #expect(decoded.reward == nil)
     }
 
+    @Test func decodesRewardAvailability() throws {
+        let json = #"{"showPassFailButtons":true,"reward":{"description":"Coffee","availableCodes":0,"availabilityStatus":"No codes left","totalCodes":5}}"#
+        let decoded = try JSONDecoder().decode(BuildBarberClient.TestDefinitionResponse.self, from: Data(json.utf8))
+        #expect(decoded.reward?.availableCodes == 0)
+        #expect(decoded.reward?.availabilityStatus == "No codes left")
+        #expect(decoded.reward?.totalCodes == 5)
+        #expect(decoded.reward?.hasNoCodesLeft == true)
+    }
+
     @Test func testModelDecodesReward() throws {
         let json = #"{"title":"Test","instructions":"Try it.","checklist":[],"showPassFailButtons":false,"reward":{"description":null,"groupTitle":"Prize"}}"#
         let decoded = try JSONDecoder().decode(BuildBarberTest.self, from: Data(json.utf8))
