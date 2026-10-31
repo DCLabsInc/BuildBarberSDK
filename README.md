@@ -160,12 +160,12 @@ If submission or the video upload fails, the SDK shows an alert with the full
 error text and a **Copy to clipboard** button. Note that a failed video upload
 happens after the result was recorded.
 
-### Device telemetry (SDK 2.0.0+)
+### Device telemetry
 
-SDK 2.0.0 and later includes available device telemetry with each test result:
-device model, iOS version, network type, battery level, app version, device
-language, physical memory, and screen diagonal in points. These optional values
-are collected by the SDK and sent as top-level fields with the result; values
-that are unavailable are omitted. No location data is collected.
+The SDK includes available device telemetry with each test result: device model,
+iOS version, network type, battery level, host app version, device language,
+physical memory, and screen diagonal in points. These optional values are sent
+as top-level fields with the result; values that are unavailable are omitted.
+No location data is collected.
 
 Never log or expose your API key in client-side diagnostics.
